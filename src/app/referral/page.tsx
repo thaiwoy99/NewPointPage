@@ -1,0 +1,2713 @@
+"use client";
+
+import type React from "react";
+
+import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import Chart from "chart.js/auto";
+import confetti from "canvas-confetti";
+import QRCode from "qrcode";
+import { Toaster, toast } from "react-hot-toast";
+import { useAppContext } from "@/context/AppWalletProvider";
+import {
+  X,
+  HelpCircle,
+  Save,
+  Award,
+  Share2,
+  ListFilter,
+  TrendingUp,
+  Users,
+  DollarSign,
+  Clock,
+  Sparkles,
+  LinkIcon,
+  QrCode,
+  Wallet,
+  AlertCircle,
+  CopyCheck,
+  ChevronDown,
+} from "lucide-react";
+
+interface Referral {
+  id: string;
+  name: string;
+  date: string;
+  earnings: number;
+  status: "PENDING" | "ACTIVE" | "INACTIVE";
+}
+
+interface LeaderboardEntry {
+  name: string;
+  referrals: number;
+}
+
+interface FAQ {
+  question: string;
+  answer: string;
+}
+
+interface UserReferralData {
+  referralCode: string | null;
+  defaultReferralPercentage: number;
+  referrals: number;
+  earnings: number;
+  pending: number;
+}
+
+const SkeletonLoader: React.FC = () => {
+  return (
+    <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(134,239,172,0.1),transparent_50%)]" />
+      </div>
+
+      <div className="relative z-10 container mx-auto px-4 py-12 space-y-12">
+        {/* Hero Skeleton */}
+        <div className="text-center space-y-6">
+          <div className="h-12 w-96 mx-auto bg-gray-800 animate-pulse rounded-lg" />
+          <div className="h-6 w-64 mx-auto bg-gray-800 animate-pulse rounded-lg" />
+          <div className="h-14 w-80 mx-auto bg-gray-800 animate-pulse rounded-lg" />
+        </div>
+
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-gray-900/50 border border-gray-800 rounded-xl p-6"
+            >
+              <div className="h-6 w-24 bg-gray-800 animate-pulse rounded mb-4" />
+              <div className="h-8 w-16 bg-gray-800 animate-pulse rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Chart Skeleton */}
+        <div className="max-w-4xl mx-auto">
+          <div className="h-64 bg-gray-900/50 border border-gray-800 rounded-xl animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ReferralDashboard: React.FC = () => {
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [modalStep, setModalStep] = useState(1);
+  const [customCode, setCustomCode] = useState("");
+  const [percentage, setPercentage] = useState<number>(0.001);
+  const [showFAQ, setShowFAQ] = useState(false);
+  const [userReferralData, setUserReferralData] =
+    useState<UserReferralData | null>(null);
+  const [history, setHistory] = useState<Referral[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [faqs, setFaqs] = useState<FAQ[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const { walletAddress, connecting, connected } = useAppContext();
+
+  // Demo data
+  const demoStats = { referrals: 5, earnings: 50, pending: 10 };
+  const demoFAQs: FAQ[] = [
+    {
+      question: "How do referrals work?",
+      answer:
+        "Invite friends with your code to earn a percentage of their transactions on Deserialize.",
+    },
+    {
+      question: "When are earnings paid?",
+      answer:
+        "Earnings are credited after referred users complete transactions.",
+    },
+  ];
+
+  const isNewUser = !connected;
+  const stats = isNewUser
+    ? { referrals: 0, earnings: 0, pending: 0 }
+    : userReferralData || demoStats;
+  const historyData = isNewUser || history.length === 0 ? [] : history;
+  const leaderboardData =
+    isNewUser || leaderboard.length === 0 ? [] : leaderboard;
+  const faqsData = faqs.length > 0 ? faqs : demoFAQs;
+
+  // Fetch data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!connected || !walletAddress) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const userResponse = await fetch(
+          `/api/user?walletAddress=${walletAddress}`
+        );
+        if (!userResponse.ok) {
+          const errorData = await userResponse.json();
+          throw new Error(errorData.error || "Failed to fetch user data");
+        }
+        const userData = await userResponse.json();
+
+        const statsResponse = await fetch(
+          `/api/referral-stats?walletAddress=${walletAddress}`
+        );
+        if (!statsResponse.ok) {
+          const errorData = await statsResponse.json();
+          throw new Error(errorData.error || "Failed to fetch stats");
+        }
+        const statsData = await statsResponse.json();
+
+        const historyResponse = await fetch(
+          `/api/referrals/history?walletAddress=${walletAddress}`
+        );
+        let historyData: Referral[] = [];
+        if (historyResponse.ok) {
+          historyData = await historyResponse.json();
+        } else {
+          console.warn("No referral history data available");
+        }
+
+        const leaderboardResponse = await fetch("/api/referrals/leaderboard");
+        let leaderboardData: LeaderboardEntry[] = [];
+        if (leaderboardResponse.ok) {
+          leaderboardData = await leaderboardResponse.json();
+        } else {
+          console.warn("No leaderboard data available");
+        }
+
+        const combinedData = {
+          referralCode: userData.referralCode,
+          defaultReferralPercentage: userData.defaultReferralPercentage / 100,
+          referrals: statsData.referrals,
+          earnings: statsData.earnings,
+          pending: statsData.pending,
+        };
+
+        setUserReferralData(combinedData);
+        setReferralCode(combinedData.referralCode);
+        setPercentage(combinedData.defaultReferralPercentage);
+        setHistory(historyData);
+        setLeaderboard(leaderboardData);
+      } catch (error: any) {
+        console.error("Failed to fetch data:", error);
+        toast.custom((t) => (
+          <div
+            className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+              t.visible ? "animate-enter" : "animate-leave"
+            }`}
+            style={{ background: "#86efac", color: "#000" }}
+          >
+            <AlertCircle size={20} color="#000" />
+            <span>{error.message || "Failed to fetch data."}</span>
+          </div>
+        ));
+        setUserReferralData({
+          referralCode: null,
+          defaultReferralPercentage: 0.001,
+          referrals: demoStats.referrals,
+          earnings: demoStats.earnings,
+          pending: demoStats.pending,
+        });
+        setHistory([]);
+        setLeaderboard([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [connected, walletAddress]);
+
+  // Enhanced particle background
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      console.error("Canvas not found");
+      return;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      console.error("Canvas context not available");
+      return;
+    }
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    interface Particle {
+      x: number;
+      y: number;
+      radius?: number;
+      length?: number;
+      rotation?: number;
+      vx: number;
+      vy: number;
+      opacity: number;
+      type: "circle" | "line";
+      wave: boolean;
+      waveOffset: number;
+      pulse: boolean;
+      pulseScale: number;
+    }
+
+    const particles: Particle[] = Array.from({ length: 120 }, () => {
+      const isCircle = Math.random() < 0.7;
+      return {
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: isCircle ? Math.random() * 2 + 1 : undefined,
+        length: !isCircle ? Math.random() * 3 + 2 : undefined,
+        rotation: !isCircle ? Math.random() * Math.PI * 2 : undefined,
+        vx: Math.random() * 0.5 - 0.25,
+        vy: Math.random() * 0.5 - 0.25,
+        opacity: Math.random() * 0.6 + 0.3,
+        type: isCircle ? "circle" : "line",
+        wave: Math.random() < 0.2 && isCircle,
+        waveOffset: Math.random() * Math.PI * 2,
+        pulse: Math.random() < 0.1 && isCircle,
+        pulseScale: 1,
+      };
+    });
+
+    let mouseX = 0,
+      mouseY = 0;
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    };
+    canvas.addEventListener("mousemove", handleMouseMove);
+
+    const animate = (time: number) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw connection lines
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const p1 = particles[i],
+            p2 = particles[j];
+          const dx = p1.x - p2.x,
+            dy = p1.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 100) {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(134, 239, 172, ${0.4 * (1 - dist / 100)})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Update and draw particles
+      particles.forEach((p) => {
+        // Mouse interaction
+        const dx = mouseX - p.x,
+          dy = mouseY - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        let currentOpacity = p.opacity;
+        if (dist < 150) {
+          p.vx += (dx / dist) * 0.02;
+          p.vy += (dy / dist) * 0.02;
+          currentOpacity = Math.min(
+            0.9,
+            p.opacity + ((150 - dist) / 150) * 0.4
+          );
+        }
+
+        // Update position
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.wave) {
+          p.y += Math.sin(time / 1000 + p.waveOffset) * 0.5;
+        }
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+        p.vx = Math.max(-0.5, Math.min(0.5, p.vx));
+        p.vy = Math.max(-0.5, Math.min(0.5, p.vy));
+
+        // Pulse effect
+        if (p.pulse) {
+          p.pulseScale = 0.8 + Math.sin(time / 500) * 0.2;
+        }
+
+        // Draw particle
+        ctx.beginPath();
+        if (p.type === "circle") {
+          ctx.arc(
+            p.x,
+            p.y,
+            p.radius! * (p.pulse ? p.pulseScale : 1),
+            0,
+            Math.PI * 2
+          );
+          ctx.fillStyle = `rgba(134, 239, 172, ${currentOpacity})`;
+          ctx.fill();
+        } else {
+          const x2 = p.x + Math.cos(p.rotation!) * p.length!;
+          const y2 = p.y + Math.sin(p.rotation!) * p.length!;
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = `rgba(134, 239, 172, ${currentOpacity})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      });
+
+      requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+
+    return () => canvas.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
+  // Chart setup
+  useEffect(() => {
+    if (isNewUser || isLoading || history.length === 0) return;
+    const ctx = document.getElementById("earningsChart") as HTMLCanvasElement;
+    if (!ctx) return;
+
+    // Aggregate earnings by month
+    const earningsByMonth: { [key: string]: number } = {};
+    history.forEach((entry) => {
+      const date = new Date(entry.date);
+      const monthYear = date.toLocaleString("default", {
+        month: "short",
+        year: "numeric",
+      });
+      earningsByMonth[monthYear] =
+        (earningsByMonth[monthYear] || 0) + entry.earnings;
+    });
+
+    // Sort months chronologically
+    const labels = Object.keys(earningsByMonth).sort((a, b) => {
+      const dateA = new Date(`1 ${a}`);
+      const dateB = new Date(`1 ${b}`);
+      return dateA.getTime() - dateB.getTime();
+    });
+    const data = labels.map((label) => earningsByMonth[label]);
+
+    const chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Earnings ($)",
+            data,
+            borderColor: "#86efac",
+            backgroundColor: "rgba(134, 239, 172, 0.1)",
+            pointBackgroundColor: "#86efac",
+            pointBorderColor: "#86efac",
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            fill: true,
+            tension: 0.4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: "#e5e7eb" } },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: "#9ca3af" },
+            grid: { color: "rgba(156, 163, 175, 0.1)" },
+          },
+          x: {
+            ticks: { color: "#9ca3af" },
+            grid: { color: "rgba(156, 163, 175, 0.1)" },
+          },
+        },
+      },
+    });
+
+    return () => chart.destroy();
+  }, [isNewUser, isLoading, history]);
+
+  // QR code generation
+  useEffect(() => {
+    if (referralCode && !isLoading) {
+      const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL || "https://www.deserialize.xyz/";
+      QRCode.toCanvas(
+        document.getElementById("qrCode"),
+        `${appUrl}?ref=${referralCode}`,
+        {
+          width: 120,
+          color: { dark: "#86efac", light: "#000000" },
+        }
+      );
+    }
+  }, [referralCode, isLoading]);
+
+  // Generate referral code
+  const generateReferralCode = async () => {
+    if (!connected || !walletAddress) {
+      toast.custom((t) => (
+        <div
+          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+            t.visible ? "animate-enter" : "animate-leave"
+          }`}
+          style={{ background: "#86efac", color: "#000" }}
+        >
+          <Wallet size={20} color="#000" />
+          <span>Connect your wallet to unlock the power of referrals!</span>
+        </div>
+      ));
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/referral-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ walletAddress, customCode }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate referral code");
+      }
+      const { referralCode: newCode } = await response.json();
+      setReferralCode(newCode);
+      setShowModal(false);
+      setModalStep(1);
+      setCustomCode("");
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ["#86efac"],
+      });
+      toast.custom((t) => (
+        <div
+          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+            t.visible ? "animate-enter" : "animate-leave"
+          }`}
+          style={{ background: "#86efac", color: "#000" }}
+        >
+          <Save size={20} color="#000" />
+          <span>Referral code generated!</span>
+        </div>
+      ));
+    } catch (error: any) {
+      console.error("Failed to generate referral code:", error);
+      toast.custom((t) => (
+        <div
+          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+            t.visible ? "animate-enter" : "animate-leave"
+          }`}
+          style={{ background: "#FFA500", color: "#000" }}
+        >
+          <AlertCircle size={20} color="#000" />
+          <span>{error.message || "Failed to generate referral code."}</span>
+        </div>
+      ));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Save percentage
+  const savePercentage = async () => {
+    if (!connected || !walletAddress) {
+      toast.custom((t) => (
+        <div
+          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+            t.visible ? "animate-enter" : "animate-leave"
+          }`}
+          style={{ background: "#86efac", color: "#000" }}
+        >
+          <Wallet size={20} color="#000" />
+          <span>Connect your wallet to unlock the power of referrals!</span>
+        </div>
+      ));
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/user/percentage", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ walletAddress, percentage }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save percentage");
+      }
+      const { defaultReferralPercentage } = await response.json();
+      setPercentage(defaultReferralPercentage);
+      confetti({
+        particleCount: 50,
+        spread: 50,
+        colors: ["#86efac"],
+      });
+      toast.custom((t) => (
+        <div
+          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+            t.visible ? "animate-enter" : "animate-leave"
+          }`}
+          style={{ background: "#86efac", color: "#000" }}
+        >
+          <Save size={20} color="#000" />
+          <span>Percentage saved!</span>
+        </div>
+      ));
+    } catch (error: any) {
+      console.error("Failed to save percentage:", error);
+      toast.custom((t) => (
+        <div
+          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+            t.visible ? "animate-enter" : "animate-leave"
+          }`}
+          style={{ background: "#86efac", color: "#000" }}
+        >
+          <AlertCircle size={20} color="#000" />
+          <span>{error.message || "Failed to save percentage."}</span>
+        </div>
+      ));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Claim NFT
+  const claimNFT = async () => {
+    if (!connected || !walletAddress) {
+      toast.custom((t) => (
+        <div
+          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+            t.visible ? "animate-enter" : "animate-leave"
+          }`}
+          style={{ background: "#86efac", color: "#000" }}
+        >
+          <Wallet size={20} color="#000" />
+          <span>Connect your wallet to unlock the power of referrals!</span>
+        </div>
+      ));
+      return;
+    }
+
+    toast.custom((t) => (
+      <div
+        className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+          t.visible ? "animate-enter" : "animate-leave"
+        }`}
+        style={{ background: "#86efac", color: "#000" }}
+      >
+        <AlertCircle size={20} color="#000" />
+        <span>NFT claim coming soon!</span>
+      </div>
+    ));
+  };
+
+  // Copy to clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.custom((t) => (
+      <div
+        className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+          t.visible ? "animate-enter" : "animate-leave"
+        }`}
+        style={{ background: "#86efac", color: "#000" }}
+      >
+        <CopyCheck size={20} color="#000" />
+        <span>Copied!</span>
+      </div>
+    ));
+  };
+
+  // Close modal
+  const closeModal = () => {
+    setShowModal(false);
+    setModalStep(1);
+    setCustomCode("");
+  };
+
+  if (isLoading) {
+    return <SkeletonLoader />;
+  }
+
+  return (
+    <div className="min-h-screen bg-black mt-[80px] text-white relative overflow-hidden">
+      {/* Pure dark background with subtle grid pattern */}
+      <div className="absolute inset-0 bg-black">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(134,239,172,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(134,239,172,0.03)_1px,transparent_1px)] bg-[size:50px_50px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(134,239,172,0.05),transparent_70%)]" />
+      </div>
+
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: "#1f2937",
+            color: "#f3f4f6",
+            border: "1px solid #374151",
+          },
+          duration: 3000,
+        }}
+      />
+
+      <canvas ref={canvasRef} className="absolute inset-0 z-0 opacity-60" />
+
+      {/* Floating orbs animation */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        {[...Array(6)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-[#86efac]/10 to-[#22c55e]/5 blur-xl"
+            animate={{
+              x: [0, 100, 0],
+              y: [0, -100, 0],
+              scale: [1, 1.2, 1],
+            }}
+            transition={{
+              duration: 10 + i * 2,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+              delay: i * 2,
+            }}
+            style={{
+              left: `${20 + i * 15}%`,
+              top: `${10 + i * 10}%`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="relative z-10 container mx-auto px-4 py-12 space-y-16">
+        {/* Hero Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="text-center space-y-8"
+        >
+          <div className="space-y-4">
+            <div className="hidden">
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#86efac]/10 border border-[#86efac]/20 rounded-full text-[#86efac] text-sm font-medium"
+              >
+                <Sparkles className="w-4 h-4" />
+                Deserialize Referral Program
+              </motion.div>
+            </div>
+
+            <h1 className="text-2xl md:text-7xl font-bold bg-gradient-to-r  from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+              Earn on{" "}
+              <span className="bg-gradient-to-r from-[#86efac] to-[#22c55e] bg-clip-text text-transparent">
+                Deserialize
+              </span>
+            </h1>
+            <p className="text-base text-xl">
+              You decide the fees we charge your referrals- we’ll pay you 70% of
+              it!!
+            </p>
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed hidden"
+            >
+              {isNewUser
+                ? "Start by generating your unique referral code to invite friends and earn rewards!"
+                : `Your referrals have earned you $${stats.earnings} so far!`}
+            </motion.p>
+          </div>
+
+          {referralCode ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="max-w-2xl mx-auto"
+            >
+              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8 space-y-6">
+                <h3 className="text-2xl font-semibold text-[#86efac] flex items-center gap-2">
+                  <Share2 className="w-6 h-6" />
+                  Share Your Referral
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Input
+                      value={`${
+                        process.env.NEXT_PUBLIC_APP_URL ||
+                        "https://www.deserialize.xyz"
+                      }/?ref=${referralCode}`}
+                      readOnly
+                      className="flex-1 bg-gray-800/50 border-gray-700 text-gray-200 focus:border-[#86efac] focus:ring-[#86efac]/20"
+                    />
+                    <Button
+                      onClick={() =>
+                        copyToClipboard(
+                          `${
+                            process.env.NEXT_PUBLIC_APP_URL ||
+                            "https://www.deserialize.xyz"
+                          }/?ref=${referralCode}`
+                        )
+                      }
+                      className="bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium px-6"
+                    >
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                      Copy Link
+                    </Button>
+                  </div>
+
+                  <div className="flex flex-wrap justify-center gap-3 hidden">
+                    {["Twitter", "Telegram", "Discord"].map((platform) => (
+                      <Button
+                        key={platform}
+                        variant="outline"
+                        onClick={() =>
+                          toast(`Share on ${platform} coming soon!`)
+                        }
+                        className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50 hover:text-[#86efac]"
+                      >
+                        {platform}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-col items-center gap-4 pt-4 hidden">
+                    <canvas id="qrCode" className="rounded-lg" />
+                    <Button
+                      onClick={() => toast.success("QR code downloaded!")}
+                      variant="outline"
+                      className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50 hover:text-[#86efac]"
+                    >
+                      <QrCode className="w-4 h-4 mr-2" />
+                      Download QR
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              animate={{ scale: [1, 1.02, 1] }}
+              transition={{ repeat: Number.POSITIVE_INFINITY, duration: 2 }}
+            >
+              <Button
+                onClick={() => {
+                  if (!connected || !walletAddress) {
+                    toast.custom((t) => (
+                      <div
+                        className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+                          t.visible ? "animate-enter" : "animate-leave"
+                        }`}
+                        style={{ background: "#86efac", color: "#000" }}
+                      >
+                        <Wallet size={20} color="#000" />
+                        <span>
+                          Connect your wallet to start earning from referrals!
+                        </span>
+                      </div>
+                    ));
+                    return;
+                  }
+                  setShowModal(true);
+                }}
+                size="lg"
+                className="bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90 font-semibold text-lg px-8 py-4 rounded-xl shadow-lg shadow-[#86efac]/25"
+              >
+                <Sparkles className="w-5 h-5 mr-2" />
+                Generate Referral Link
+              </Button>
+            </motion.div>
+          )}
+        </motion.section>
+
+        {/* Fee Percentage Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="max-w-2xl mx-auto"
+        >
+          <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-xl text-center text-[#86efac] flex items-center justify-center gap-2">
+                <TrendingUp className="w-6 h-6" />
+                Set how much fee we charge your referrals
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Slider
+                  value={[percentage * 100]}
+                  onValueChange={(value) => setPercentage(value[0] / 100)}
+                  min={0.05}
+                  max={1}
+                  step={0.001}
+                  className="w-full"
+                />
+
+                <div className="text-center space-y-2">
+                  <div className="text-3xl font-bold text-[#86efac]">
+                    {(percentage * 100).toFixed(3)}%
+                  </div>
+
+                  {/* <div className="flex items-center justify-center gap-4 text-sm">
+                    <Badge
+                      variant="outline"
+                      className="border-[#86efac]/30 text-[#86efac]"
+                    >
+                      {(percentage * 100).toFixed(2)}% fees = $
+                      {(10000 * percentage).toFixed(2)}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="border-gray-600 text-gray-400"
+                    >
+                      Your Share: ${(10000 * percentage * 0.7).toFixed(2)}
+                    </Badge>
+                  </div> */}
+
+                  <div className="flex flex-col md:flex-row">
+                    <p className="text-gray-400 w-fit flex-row">
+                      {isNewUser
+                        ? "Set your earnings rate to kickstart referrals!"
+                        : `If your referral trades $10,000, you'll earn $${(
+                            10000 *
+                            percentage *
+                            0.7
+                          ).toFixed(2)}`}
+                    </p>
+
+                    <span
+                      className="w-fit content-center mt-3 ml-15 md:mt-0 md:ml-3 flex items-center gap-1 cursor-pointer text-sm text-green-400 border-b"
+                      // style={{ textDecoration: "underline" }}
+                      onClick={() => setIsOpen(!isOpen)}
+                    >
+                      View breakdown
+                      <ChevronDown
+                        className={`h-5 w-5 transition-transform duration-200 ${
+                          isOpen ? "rotate-180" : ""
+                        }`}
+                        style={{ display: "inline" }}
+                      />
+                    </span>
+                  </div>
+                </div>
+
+                {isOpen && (
+                  <div className="mt-4 p-4 mx-auto rounded-md">
+                    <div className="flex items-center justify-center gap-4 text-sm">
+                      {/* <Badge
+                      variant="outline"
+                      className="border-[#86efac]/30 text-[#86efac]"
+                    >
+                      Gross: ${(10000 * percentage).toFixed(2)}
+                    </Badge> */}
+                      <Badge
+                        variant="outline"
+                        className="border-[#86efac]/30 text-[#86efac]"
+                      >
+                        {(percentage * 100).toFixed(2)}% fees = $
+                        {(10000 * percentage).toFixed(2)}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="border-gray-600 text-gray-400"
+                      >
+                        Your Share: ${(10000 * percentage * 0.7).toFixed(2)}
+                        {/* Net (70%): ${(10000 * percentage * 0.7).toFixed(2)} */}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Button
+                onClick={savePercentage}
+                disabled={!referralCode}
+                className="w-full bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save Percentage
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.section>
+
+        {/* Stats Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="space-y-8"
+        >
+          <h2 className="text-3xl font-bold text-center">
+            Your Referral Stats
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            {[
+              {
+                label: "Total Referrals",
+                value: isNewUser ? "0" : stats.referrals.toString(),
+                icon: Users,
+                color: "text-blue-400",
+                bgColor: "bg-blue-400/10",
+              },
+              {
+                label: "Total Earnings",
+                value: isNewUser ? "$0" : `$${stats.earnings}`,
+                icon: DollarSign,
+                color: "text-[#86efac]",
+                bgColor: "bg-[#86efac]/10",
+              },
+              // {
+              //   label: "Pending Earnings",
+              //   value: isNewUser ? "$0" : `$${stats.pending}`,
+              //   icon: Clock,
+              //   color: "text-yellow-400",
+              //   bgColor: "bg-yellow-400/10",
+              // },
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ scale: 0.9, opacity: 0 }}
+                whileInView={{ scale: 1, opacity: 1 }}
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+              >
+                <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800 hover:border-gray-700 transition-colors">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-xl ${stat.bgColor}`}>
+                        <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400 font-medium">
+                          {stat.label}
+                        </p>
+                        <p className="text-2xl font-bold">{stat.value}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Chart */}
+          <div className="max-w-4xl mx-auto hidden">
+            {isNewUser || history.length === 0 ? (
+              <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+                <CardContent className="p-12 text-center">
+                  <TrendingUp className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-400 mb-2">
+                    No Earnings Yet
+                  </h3>
+                  <p className="text-gray-500 mb-6">
+                    Share your referral code to see your earnings growth!
+                  </p>
+                  {!referralCode && (
+                    <Button
+                      onClick={() => {
+                        if (!connected || !walletAddress) {
+                          toast.custom((t) => (
+                            <div
+                              className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+                                t.visible ? "animate-enter" : "animate-leave"
+                              }`}
+                              style={{ background: "#86efac", color: "#000" }}
+                            >
+                              <Wallet size={20} color="#000" />
+                              <span>Connect your wallet to start earning!</span>
+                            </div>
+                          ));
+                          return;
+                        }
+                        setShowModal(true);
+                      }}
+                      className="bg-[#86efac] text-black hover:bg-[#86efac]/90"
+                    >
+                      Generate Code Now
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+                <CardHeader>
+                  <CardTitle className="text-xl text-center">
+                    Earnings Over Time
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <canvas id="earningsChart" height="200" className="w-full" />
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </motion.section>
+
+        {/* Leaderboard */}
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="max-w-2xl mx-auto"
+        >
+          <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-2xl text-center text-[#86efac] flex items-center justify-center gap-2">
+                <Award className="w-6 h-6" />
+                Top Referrers
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isNewUser || leaderboardData.length === 0 ? (
+                <div className="text-center py-8">
+                  <Award className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-400 mb-2">
+                    Be the First Top Referrer!
+                  </h3>
+                  <p className="text-gray-500">
+                    Invite friends to climb the leaderboard.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {leaderboardData.map((entry, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ x: 50, opacity: 0 }}
+                      whileInView={{ x: 0, opacity: 1 }}
+                      transition={{ duration: 0.5, delay: i * 0.1 }}
+                      className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg border-l-4 border-[#86efac]"
+                    >
+                      <div className="w-8 h-8 bg-[#86efac]/20 rounded-full flex items-center justify-center text-[#86efac] font-bold">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{entry.name}</p>
+                        <p className="text-sm text-gray-400">
+                          {entry.referrals} referrals
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.section>
+
+        {/* Referral History */}
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="max-w-4xl mx-auto"
+        >
+          <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <CardTitle className="text-2xl text-[#86efac]">
+                  Referral History
+                </CardTitle>
+                <div className="flex gap-2">
+                  {["Date", "Earnings"].map((filter) => (
+                    <Button
+                      key={filter}
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        toast.custom((t) => (
+                          <div
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+                              t.visible ? "animate-enter" : "animate-leave"
+                            }`}
+                            style={{ background: "#86efac", color: "#000" }}
+                          >
+                            <ListFilter size={20} color="#000" />
+                            <span>Sorting by {filter} coming soon!</span>
+                          </div>
+                        ))
+                      }
+                      className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50"
+                    >
+                      <ListFilter className="w-4 h-4 mr-1" />
+                      {filter}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {historyData.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-400 mb-2">
+                    No Referrals Yet
+                  </h3>
+                  <p className="text-gray-500 mb-6">
+                    Invite friends to start building your referral history!
+                  </p>
+                  {!referralCode && (
+                    <Button
+                      onClick={() => {
+                        if (!connected || !walletAddress) {
+                          toast.custom((t) => (
+                            <div
+                              className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+                                t.visible ? "animate-enter" : "animate-leave"
+                              }`}
+                              style={{ background: "#86efac", color: "#000" }}
+                            >
+                              <Wallet size={20} color="#000" />
+                              <span>
+                                Connect your wallet to unlock the power of
+                                referrals!
+                              </span>
+                            </div>
+                          ));
+                          return;
+                        }
+                        setShowModal(true);
+                      }}
+                      className="bg-[#86efac] text-black hover:bg-[#86efac]/90"
+                    >
+                      Generate Link
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historyData.map((entry) => (
+                    <motion.div
+                      key={entry.id}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      transition={{ duration: 0.5 }}
+                      className={`p-4 rounded-lg border-l-4 ${
+                        entry.status === "ACTIVE"
+                          ? "bg-[#86efac]/5 border-[#86efac]"
+                          : "bg-gray-800/30 border-gray-600"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">{entry.name}</p>
+                          <p className="text-sm text-gray-400">
+                            Joined {new Date(entry.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-[#86efac]">
+                            ${entry.earnings}
+                          </p>
+                          <Badge
+                            variant={
+                              entry.status === "ACTIVE"
+                                ? "default"
+                                : "secondary"
+                            }
+                            className={
+                              entry.status === "ACTIVE"
+                                ? "bg-[#86efac]/20 text-[#86efac]"
+                                : ""
+                            }
+                          >
+                            {entry.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.section>
+
+        {/* Rewards Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="max-w-2xl mx-auto"
+        >
+          <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-2xl text-center text-[#86efac] flex items-center justify-center gap-2">
+                <Award className="w-6 h-6" />
+                Rewards & Milestones
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="text-center space-y-4">
+                <p className="text-gray-400">
+                  {isNewUser
+                    ? "Make your first referral to unlock rewards!"
+                    : `${stats.referrals}/5 Referrals for Bronze Badge`}
+                </p>
+
+                <div className="w-full bg-gray-800 rounded-full h-3">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{
+                      width: `${Math.min((stats.referrals / 5) * 100, 100)}%`,
+                    }}
+                    transition={{ duration: 1, delay: 0.5 }}
+                    className="bg-gradient-to-r from-[#86efac] to-[#22c55e] h-3 rounded-full"
+                  />
+                </div>
+
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>0</span>
+                  <span>5 referrals</span>
+                </div>
+              </div>
+
+              <Button
+                onClick={claimNFT}
+                disabled={stats.referrals < 5}
+                className={`w-full font-medium ${
+                  stats.referrals >= 5
+                    ? "bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90"
+                    : "bg-gray-800 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                <Award className="w-4 h-4 mr-2" />
+                {stats.referrals >= 5
+                  ? "Claim Bronze NFT"
+                  : "Bronze NFT Locked"}
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.section>
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="w-full max-w-md"
+          >
+            <Card className="bg-gray-900 border-gray-800 relative">
+              <Button
+                onClick={closeModal}
+                variant="ghost"
+                size="sm"
+                className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+
+              {modalStep === 1 && (
+                <motion.div
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <CardHeader className="text-center space-y-4">
+                    <div className="w-16 h-16 bg-[#86efac]/20 rounded-full flex items-center justify-center mx-auto">
+                      <Sparkles className="w-8 h-8 text-[#86efac]" />
+                    </div>
+                    <CardTitle className="text-2xl">
+                      Start Earning with Referrals!
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <p className="text-gray-400 text-center">
+                      Invite friends and earn a percentage of their transactions
+                      on Deserialize.
+                    </p>
+                    <Button
+                      onClick={() => setModalStep(2)}
+                      className="w-full bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium"
+                    >
+                      Continue
+                    </Button>
+                  </CardContent>
+                </motion.div>
+              )}
+
+              {modalStep === 2 && (
+                <motion.div
+                  initial={{ x: 20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-2xl">
+                      Customize Your Code
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <Input
+                        value={customCode}
+                        onChange={(e) => setCustomCode(e.target.value)}
+                        placeholder="Enter custom referral code (optional)"
+                        className="bg-gray-800 border-gray-700 text-white focus:border-[#86efac] focus:ring-[#86efac]/20"
+                      />
+                      <p className="text-sm text-gray-400">
+                        {customCode
+                          ? "Custom code available!"
+                          : "Leave empty for auto-generated code, or enter 3-10 alphanumeric characters"}
+                      </p>
+                    </div>
+                    <Button
+                      onClick={generateReferralCode}
+                      className="w-full bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium"
+                    >
+                      Generate Referral Code
+                    </Button>
+                  </CardContent>
+                </motion.div>
+              )}
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* FAQ Button */}
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        whileHover={{ scale: 1.1 }}
+        className="fixed bottom-6 right-6 z-40"
+      >
+        <Button
+          onClick={() => setShowFAQ(!showFAQ)}
+          className="bg-[#86efac] text-black hover:bg-[#86efac]/90 rounded-full w-14 h-14 shadow-lg shadow-[#86efac]/25"
+        >
+          <HelpCircle className="w-6 h-6" />
+        </Button>
+      </motion.div>
+
+      {/* FAQ Panel */}
+      {showFAQ && (
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.95 }}
+          className="fixed bottom-24 right-6 w-80 max-w-[calc(100vw-3rem)] z-40"
+        >
+          <Card className="bg-gray-900 border-gray-800 shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-lg text-[#86efac]">
+                Frequently Asked Questions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="single" collapsible>
+                {faqsData.map((faq, i) => (
+                  <AccordionItem
+                    key={i}
+                    value={`item-${i}`}
+                    className="border-gray-800"
+                  >
+                    <AccordionTrigger className="text-[#86efac] hover:text-[#86efac]/80">
+                      {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-gray-400">
+                      {faq.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
+export default ReferralDashboard;
+
+// "use client";
+
+// import type React from "react";
+
+// import { useState, useEffect, useRef } from "react";
+// import { motion } from "framer-motion";
+// import { Button } from "@/components/ui/button";
+// import { Input } from "@/components/ui/input";
+// import { Slider } from "@/components/ui/slider";
+// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+// import { Badge } from "@/components/ui/badge";
+// import {
+//   Accordion,
+//   AccordionContent,
+//   AccordionItem,
+//   AccordionTrigger,
+// } from "@/components/ui/accordion";
+// import Chart from "chart.js/auto";
+// import confetti from "canvas-confetti";
+// import QRCode from "qrcode";
+// import { Toaster, toast } from "react-hot-toast";
+// import { useAppContext } from "@/context/AppWalletProvider";
+// import {
+//   X,
+//   HelpCircle,
+//   Save,
+//   Award,
+//   Share2,
+//   ListFilter,
+//   TrendingUp,
+//   Users,
+//   DollarSign,
+//   Clock,
+//   Sparkles,
+//   LinkIcon,
+//   QrCode,
+// } from "lucide-react";
+
+// interface Referral {
+//   id: string;
+//   name: string;
+//   date: string;
+//   earnings: number;
+//   status: "PENDING" | "ACTIVE" | "INACTIVE";
+// }
+
+// interface LeaderboardEntry {
+//   name: string;
+//   referrals: number;
+// }
+
+// interface FAQ {
+//   question: string;
+//   answer: string;
+// }
+
+// interface UserReferralData {
+//   referralCode: string | null;
+//   defaultReferralPercentage: number;
+//   referrals: number;
+//   earnings: number;
+//   pending: number;
+// }
+
+// const SkeletonLoader: React.FC = () => {
+//   return (
+//     <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden">
+//       {/* Animated background */}
+//       <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+//         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(134,239,172,0.1),transparent_50%)]" />
+//       </div>
+
+//       <div className="relative z-10 container mx-auto px-4 py-12 space-y-12">
+//         {/* Hero Skeleton */}
+//         <div className="text-center space-y-6">
+//           <div className="h-12 w-96 mx-auto bg-gray-800 animate-pulse rounded-lg" />
+//           <div className="h-6 w-64 mx-auto bg-gray-800 animate-pulse rounded-lg" />
+//           <div className="h-14 w-80 mx-auto bg-gray-800 animate-pulse rounded-lg" />
+//         </div>
+
+//         {/* Stats Skeleton */}
+//         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+//           {[1, 2, 3].map((i) => (
+//             <div
+//               key={i}
+//               className="bg-gray-900/50 border border-gray-800 rounded-xl p-6"
+//             >
+//               <div className="h-6 w-24 bg-gray-800 animate-pulse rounded mb-4" />
+//               <div className="h-8 w-16 bg-gray-800 animate-pulse rounded" />
+//             </div>
+//           ))}
+//         </div>
+
+//         {/* Chart Skeleton */}
+//         <div className="max-w-4xl mx-auto">
+//           <div className="h-64 bg-gray-900/50 border border-gray-800 rounded-xl animate-pulse" />
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// const ReferralDashboard: React.FC = () => {
+//   const [referralCode, setReferralCode] = useState<string | null>(null);
+//   const [showModal, setShowModal] = useState(false);
+//   const [modalStep, setModalStep] = useState(1);
+//   const [customCode, setCustomCode] = useState("");
+//   const [percentage, setPercentage] = useState<number>(0.001);
+//   const [showFAQ, setShowFAQ] = useState(false);
+//   const [userReferralData, setUserReferralData] =
+//     useState<UserReferralData | null>(null);
+//   const [history, setHistory] = useState<Referral[]>([]);
+//   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+//   const [faqs, setFaqs] = useState<FAQ[]>([]);
+//   const [isLoading, setIsLoading] = useState(true);
+//   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+//   const { walletAddress, connecting, connected } = useAppContext();
+
+//   // Demo data
+//   const demoStats = { referrals: 0, earnings: 0, pending: 0 };
+//   const demoFAQs: FAQ[] = [
+//     {
+//       question: "How do referrals work?",
+//       answer:
+//         "Invite friends with your code to earn a percentage of their transactions on Deserialize.",
+//     },
+//     {
+//       question: "When are earnings paid?",
+//       answer:
+//         "Earnings are credited after referred users complete transactions.",
+//     },
+//   ];
+
+//   const isNewUser = !connected;
+//   const stats = isNewUser
+//     ? { referrals: 0, earnings: 0, pending: 0 }
+//     : userReferralData || demoStats;
+//   const historyData = isNewUser || history.length === 0 ? [] : history;
+//   const leaderboardData =
+//     isNewUser || leaderboard.length === 0 ? [] : leaderboard;
+//   const faqsData = faqs.length > 0 ? faqs : demoFAQs;
+
+//   // Fetch data
+//   useEffect(() => {
+//     const fetchData = async () => {
+//       if (!connected || !walletAddress) {
+//         setIsLoading(false);
+//         return;
+//       }
+
+//       setIsLoading(true);
+//       try {
+//         const userResponse = await fetch(
+//           `/api/user?walletAddress=${walletAddress}`
+//         );
+//         if (!userResponse.ok) {
+//           const errorData = await userResponse.json();
+//           throw new Error(errorData.error || "Failed to fetch user data");
+//         }
+//         const userData = await userResponse.json();
+
+//         const statsResponse = await fetch(
+//           `/api/referral-stats?walletAddress=${walletAddress}`
+//         );
+//         if (!statsResponse.ok) {
+//           const errorData = await statsResponse.json();
+//           throw new Error(errorData.error || "Failed to fetch stats");
+//         }
+//         const statsData = await statsResponse.json();
+
+//         const historyResponse = await fetch(
+//           `/api/referrals/history?walletAddress=${walletAddress}`
+//         );
+//         let historyData: Referral[] = [];
+//         if (historyResponse.ok) {
+//           historyData = await historyResponse.json();
+//         }
+
+//         const leaderboardResponse = await fetch("/api/referrals/leaderboard");
+//         let leaderboardData: LeaderboardEntry[] = [];
+//         if (leaderboardResponse.ok) {
+//           leaderboardData = await leaderboardResponse.json();
+//         }
+
+//         const combinedData = {
+//           referralCode: userData.referralCode,
+//           defaultReferralPercentage: userData.defaultReferralPercentage / 100,
+//           referrals: statsData.referrals,
+//           earnings: statsData.earnings,
+//           pending: statsData.pending,
+//         };
+
+//         setUserReferralData(combinedData);
+//         setReferralCode(combinedData.referralCode);
+//         setPercentage(combinedData.defaultReferralPercentage);
+//         setHistory(historyData);
+//         setLeaderboard(leaderboardData);
+//       } catch (error: any) {
+//         console.error("Failed to fetch data:", error);
+//         toast.error(error.message || "Failed to fetch data.");
+//         setUserReferralData({
+//           referralCode: null,
+//           defaultReferralPercentage: 0.001,
+//           referrals: demoStats.referrals,
+//           earnings: demoStats.earnings,
+//           pending: demoStats.pending,
+//         });
+//         setHistory([]);
+//         setLeaderboard([]);
+//       } finally {
+//         setIsLoading(false);
+//       }
+//     };
+
+//     fetchData();
+//   }, [connected, walletAddress]);
+
+//   // Enhanced particle background
+//   useEffect(() => {
+//     const canvas = canvasRef.current;
+//     if (!canvas) return;
+//     const ctx = canvas.getContext("2d");
+//     if (!ctx) return;
+
+//     canvas.width = window.innerWidth;
+//     canvas.height = window.innerHeight;
+
+//     interface Particle {
+//       x: number;
+//       y: number;
+//       radius?: number;
+//       length?: number;
+//       rotation?: number;
+//       vx: number;
+//       vy: number;
+//       opacity: number;
+//       type: "circle" | "line";
+//       wave: boolean;
+//       waveOffset: number;
+//       pulse: boolean;
+//       pulseScale: number;
+//     }
+
+//     const particles: Particle[] = Array.from({ length: 80 }, () => {
+//       const isCircle = Math.random() < 0.7;
+//       return {
+//         x: Math.random() * canvas.width,
+//         y: Math.random() * canvas.height,
+//         radius: isCircle ? Math.random() * 1.5 + 0.5 : undefined,
+//         length: !isCircle ? Math.random() * 2 + 1 : undefined,
+//         rotation: !isCircle ? Math.random() * Math.PI * 2 : undefined,
+//         vx: Math.random() * 0.3 - 0.15,
+//         vy: Math.random() * 0.3 - 0.15,
+//         opacity: Math.random() * 0.4 + 0.2,
+//         type: isCircle ? "circle" : "line",
+//         wave: Math.random() < 0.3 && isCircle,
+//         waveOffset: Math.random() * Math.PI * 2,
+//         pulse: Math.random() < 0.1 && isCircle,
+//         pulseScale: 1,
+//       };
+//     });
+
+//     let mouseX = 0,
+//       mouseY = 0;
+//     const handleMouseMove = (e: MouseEvent) => {
+//       mouseX = e.clientX;
+//       mouseY = e.clientY;
+//     };
+//     canvas.addEventListener("mousemove", handleMouseMove);
+
+//     const animate = (time: number) => {
+//       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+//       // Connection lines
+//       for (let i = 0; i < particles.length; i++) {
+//         for (let j = i + 1; j < particles.length; j++) {
+//           const p1 = particles[i],
+//             p2 = particles[j];
+//           const dx = p1.x - p2.x,
+//             dy = p1.y - p2.y;
+//           const dist = Math.sqrt(dx * dx + dy * dy);
+//           if (dist < 120) {
+//             ctx.beginPath();
+//             ctx.moveTo(p1.x, p1.y);
+//             ctx.lineTo(p2.x, p2.y);
+//             ctx.strokeStyle = `rgba(134, 239, 172, ${0.3 * (1 - dist / 120)})`;
+//             ctx.lineWidth = 0.5;
+//             ctx.stroke();
+//           }
+//         }
+//       }
+
+//       particles.forEach((p) => {
+//         const dx = mouseX - p.x,
+//           dy = mouseY - p.y;
+//         const dist = Math.sqrt(dx * dx + dy * dy);
+//         let currentOpacity = p.opacity;
+
+//         if (dist < 100) {
+//           p.vx += (dx / dist) * 0.01;
+//           p.vy += (dy / dist) * 0.01;
+//           currentOpacity = Math.min(
+//             0.8,
+//             p.opacity + ((100 - dist) / 100) * 0.3
+//           );
+//         }
+
+//         p.x += p.vx;
+//         p.y += p.vy;
+
+//         if (p.wave) {
+//           p.y += Math.sin(time / 1000 + p.waveOffset) * 0.3;
+//         }
+
+//         if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+//         if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+//         if (p.pulse) {
+//           p.pulseScale = 0.8 + Math.sin(time / 400) * 0.2;
+//         }
+
+//         ctx.beginPath();
+//         if (p.type === "circle") {
+//           ctx.arc(
+//             p.x,
+//             p.y,
+//             p.radius! * (p.pulse ? p.pulseScale : 1),
+//             0,
+//             Math.PI * 2
+//           );
+//           ctx.fillStyle = `rgba(134, 239, 172, ${currentOpacity * 1.2})`;
+//           ctx.fill();
+//         } else {
+//           const x2 = p.x + Math.cos(p.rotation!) * p.length!;
+//           const y2 = p.y + Math.sin(p.rotation!) * p.length!;
+//           ctx.moveTo(p.x, p.y);
+//           ctx.lineTo(x2, y2);
+//           ctx.strokeStyle = `rgba(134, 239, 172, ${currentOpacity * 1.2})`;
+//           ctx.lineWidth = 1;
+//           ctx.stroke();
+//         }
+//       });
+
+//       requestAnimationFrame(animate);
+//     };
+//     requestAnimationFrame(animate);
+
+//     return () => canvas.removeEventListener("mousemove", handleMouseMove);
+//   }, []);
+
+//   // Chart setup
+//   useEffect(() => {
+//     if (isNewUser || isLoading || history.length === 0) return;
+//     const ctx = document.getElementById("earningsChart") as HTMLCanvasElement;
+//     if (!ctx) return;
+
+//     const earningsByMonth: { [key: string]: number } = {};
+//     history.forEach((entry) => {
+//       const date = new Date(entry.date);
+//       const monthYear = date.toLocaleString("default", {
+//         month: "short",
+//         year: "numeric",
+//       });
+//       earningsByMonth[monthYear] =
+//         (earningsByMonth[monthYear] || 0) + entry.earnings;
+//     });
+
+//     const labels = Object.keys(earningsByMonth).sort((a, b) => {
+//       const dateA = new Date(`1 ${a}`);
+//       const dateB = new Date(`1 ${b}`);
+//       return dateA.getTime() - dateB.getTime();
+//     });
+//     const data = labels.map((label) => earningsByMonth[label]);
+
+//     const chart = new Chart(ctx, {
+//       type: "line",
+//       data: {
+//         labels,
+//         datasets: [
+//           {
+//             label: "Earnings ($)",
+//             data,
+//             borderColor: "#86efac",
+//             backgroundColor: "rgba(134, 239, 172, 0.1)",
+//             pointBackgroundColor: "#86efac",
+//             pointBorderColor: "#86efac",
+//             pointRadius: 6,
+//             pointHoverRadius: 8,
+//             fill: true,
+//             tension: 0.4,
+//           },
+//         ],
+//       },
+//       options: {
+//         responsive: true,
+//         plugins: {
+//           legend: { labels: { color: "#e5e7eb" } },
+//         },
+//         scales: {
+//           y: {
+//             beginAtZero: true,
+//             ticks: { color: "#9ca3af" },
+//             grid: { color: "rgba(156, 163, 175, 0.1)" },
+//           },
+//           x: {
+//             ticks: { color: "#9ca3af" },
+//             grid: { color: "rgba(156, 163, 175, 0.1)" },
+//           },
+//         },
+//       },
+//     });
+
+//     return () => chart.destroy();
+//   }, [isNewUser, isLoading, history]);
+
+//   // QR code generation
+//   useEffect(() => {
+//     if (referralCode && !isLoading) {
+//       const appUrl =
+//         process.env.NEXT_PUBLIC_APP_URL || "https://www.deserialize.xyz/";
+//       QRCode.toCanvas(
+//         document.getElementById("qrCode"),
+//         `${appUrl}?ref=${referralCode}`,
+//         {
+//           width: 120,
+//           color: { dark: "#86efac", light: "#000000" },
+//         }
+//       );
+//     }
+//   }, [referralCode, isLoading]);
+
+//   // Generate referral code
+//   const generateReferralCode = async () => {
+//     if (!connected || !walletAddress) {
+//       toast.error("Connect your wallet to unlock the power of referrals!");
+//       return;
+//     }
+
+//     setIsLoading(true);
+//     try {
+//       const response = await fetch("/api/referral-code", {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ walletAddress, customCode }),
+//       });
+
+//       if (!response.ok) {
+//         const errorData = await response.json();
+//         throw new Error(errorData.error || "Failed to generate referral code");
+//       }
+
+//       const { referralCode: newCode } = await response.json();
+//       setReferralCode(newCode);
+//       setShowModal(false);
+//       setModalStep(1);
+//       setCustomCode("");
+
+//       confetti({
+//         particleCount: 150,
+//         spread: 70,
+//         origin: { y: 0.6 },
+//         colors: ["#86efac"],
+//       });
+
+//       toast.success("Referral code generated!");
+//     } catch (error: any) {
+//       console.error("Failed to generate referral code:", error);
+//       toast.error(error.message || "Failed to generate referral code.");
+//     } finally {
+//       setIsLoading(false);
+//     }
+//   };
+
+//   // Save percentage
+//   const savePercentage = async () => {
+//     if (!connected || !walletAddress) {
+//       toast.error("Connect your wallet to unlock the power of referrals!");
+//       return;
+//     }
+
+//     setIsLoading(true);
+//     try {
+//       const response = await fetch("/api/user/percentage", {
+//         method: "PATCH",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ walletAddress, percentage }),
+//       });
+
+//       if (!response.ok) {
+//         const errorData = await response.json();
+//         throw new Error(errorData.error || "Failed to save percentage");
+//       }
+
+//       const { defaultReferralPercentage } = await response.json();
+//       setPercentage(defaultReferralPercentage);
+
+//       confetti({ particleCount: 50, spread: 50, colors: ["#86efac"] });
+//       toast.success("Percentage saved!");
+//     } catch (error: any) {
+//       console.error("Failed to save percentage:", error);
+//       toast.error(error.message || "Failed to save percentage.");
+//     } finally {
+//       setIsLoading(false);
+//     }
+//   };
+
+//   // Claim NFT
+//   const claimNFT = async () => {
+//     if (!connected || !walletAddress) {
+//       toast.error("Connect your wallet to unlock the power of referrals!");
+//       return;
+//     }
+//     toast("NFT claim coming soon!", { icon: "🎉" });
+//   };
+
+//   // Copy to clipboard
+//   const copyToClipboard = (text: string) => {
+//     navigator.clipboard.writeText(text);
+//     toast.success("Copied to clipboard!");
+//   };
+
+//   // Close modal
+//   const closeModal = () => {
+//     setShowModal(false);
+//     setModalStep(1);
+//     setCustomCode("");
+//   };
+
+//   if (isLoading) {
+//     return <SkeletonLoader />;
+//   }
+
+//   return (
+//     <div className="min-h-screen bg-black mt-[80px] text-white relative overflow-hidden">
+//       {/* Pure dark background with subtle grid pattern */}
+//       <div className="absolute inset-0 bg-black">
+//         <div className="absolute inset-0 bg-[linear-gradient(rgba(134,239,172,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(134,239,172,0.03)_1px,transparent_1px)] bg-[size:50px_50px]" />
+//         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(134,239,172,0.05),transparent_70%)]" />
+//       </div>
+
+//       <Toaster
+//         position="bottom-right"
+//         toastOptions={{
+//           style: {
+//             background: "#1f2937",
+//             color: "#f3f4f6",
+//             border: "1px solid #374151",
+//           },
+//           duration: 3000,
+//         }}
+//       />
+
+//       <canvas ref={canvasRef} className="absolute inset-0 z-0 opacity-60" />
+
+//       {/* Floating orbs animation */}
+//       <div className="absolute inset-0 z-0 overflow-hidden">
+//         {[...Array(6)].map((_, i) => (
+//           <motion.div
+//             key={i}
+//             className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-[#86efac]/10 to-[#22c55e]/5 blur-xl"
+//             animate={{
+//               x: [0, 100, 0],
+//               y: [0, -100, 0],
+//               scale: [1, 1.2, 1],
+//             }}
+//             transition={{
+//               duration: 10 + i * 2,
+//               repeat: Number.POSITIVE_INFINITY,
+//               ease: "easeInOut",
+//               delay: i * 2,
+//             }}
+//             style={{
+//               left: `${20 + i * 15}%`,
+//               top: `${10 + i * 10}%`,
+//             }}
+//           />
+//         ))}
+//       </div>
+
+//       <div className="relative z-10 container mx-auto px-4 py-12 space-y-16">
+//         {/* Hero Section */}
+//         <motion.section
+//           initial={{ opacity: 0, y: 30 }}
+//           animate={{ opacity: 1, y: 0 }}
+//           transition={{ duration: 0.8 }}
+//           className="text-center space-y-8"
+//         >
+//           <div className="space-y-4">
+//             <motion.div
+//               initial={{ scale: 0.9 }}
+//               animate={{ scale: 1 }}
+//               transition={{ duration: 0.5, delay: 0.2 }}
+//               className="inline-flex items-center gap-2 px-4 py-2 bg-[#86efac]/10 border border-[#86efac]/20 rounded-full text-[#86efac] text-sm font-medium"
+//             >
+//               <Sparkles className="w-4 h-4" />
+//               Deserialize Referral Program
+//             </motion.div>
+
+//             <h1 className="text-2xl md:text-7xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+//               Earn on{" "}
+//               <span className="bg-gradient-to-r from-[#86efac] to-[#22c55e] bg-clip-text text-transparent">
+//                 Deserialize
+//               </span>
+//             </h1>
+
+//             <motion.p
+//               initial={{ opacity: 0 }}
+//               animate={{ opacity: 1 }}
+//               transition={{ delay: 0.5 }}
+//               className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed"
+//             >
+//               {isNewUser
+//                 ? "Start by generating your unique referral code to invite friends and earn rewards!"
+//                 : `Your referrals have earned you $${stats.earnings} so far!`}
+//             </motion.p>
+//           </div>
+
+//           {referralCode ? (
+//             <motion.div
+//               initial={{ opacity: 0, y: 20 }}
+//               animate={{ opacity: 1, y: 0 }}
+//               transition={{ delay: 0.7 }}
+//               className="max-w-2xl mx-auto"
+//             >
+//               <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8 space-y-6">
+//                 <h3 className="text-2xl font-semibold text-[#86efac] flex items-center gap-2">
+//                   <Share2 className="w-6 h-6" />
+//                   Share Your Referral
+//                 </h3>
+
+//                 <div className="space-y-4">
+//                   <div className="flex flex-col sm:flex-row gap-3">
+//                     <Input
+//                       value={`${
+//                         process.env.NEXT_PUBLIC_APP_URL ||
+//                         "https://www.deserialize.xyz"
+//                       }/?ref=${referralCode}`}
+//                       readOnly
+//                       className="flex-1 bg-gray-800/50 border-gray-700 text-gray-200 focus:border-[#86efac] focus:ring-[#86efac]/20"
+//                     />
+//                     <Button
+//                       onClick={() =>
+//                         copyToClipboard(
+//                           `${
+//                             process.env.NEXT_PUBLIC_APP_URL ||
+//                             "https://www.deserialize.xyz"
+//                           }/?ref=${referralCode}`
+//                         )
+//                       }
+//                       className="bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium px-6"
+//                     >
+//                       <LinkIcon className="w-4 h-4 mr-2" />
+//                       Copy Link
+//                     </Button>
+//                   </div>
+
+//                   <div className="flex flex-wrap justify-center gap-3">
+//                     {["Twitter", "Telegram", "Discord"].map((platform) => (
+//                       <Button
+//                         key={platform}
+//                         variant="outline"
+//                         onClick={() =>
+//                           toast(`Share on ${platform} coming soon!`)
+//                         }
+//                         className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50 hover:text-[#86efac]"
+//                       >
+//                         {platform}
+//                       </Button>
+//                     ))}
+//                   </div>
+
+//                   <div className="flex flex-col items-center gap-4 pt-4">
+//                     <canvas id="qrCode" className="rounded-lg" />
+//                     <Button
+//                       onClick={() => toast.success("QR code downloaded!")}
+//                       variant="outline"
+//                       className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50 hover:text-[#86efac]"
+//                     >
+//                       <QrCode className="w-4 h-4 mr-2" />
+//                       Download QR
+//                     </Button>
+//                   </div>
+//                 </div>
+//               </div>
+//             </motion.div>
+//           ) : (
+//             <motion.div
+//               whileHover={{ scale: 1.02 }}
+//               whileTap={{ scale: 0.98 }}
+//               animate={{ scale: [1, 1.02, 1] }}
+//               transition={{ repeat: Number.POSITIVE_INFINITY, duration: 2 }}
+//             >
+//               <Button
+//                 onClick={() => {
+//                   if (!connected || !walletAddress) {
+//                     toast.error(
+//                       "Connect your wallet to start earning from referrals!"
+//                     );
+//                     return;
+//                   }
+//                   setShowModal(true);
+//                 }}
+//                 size="lg"
+//                 className="bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90 font-semibold text-lg px-8 py-4 rounded-xl shadow-lg shadow-[#86efac]/25"
+//               >
+//                 <Sparkles className="w-5 h-5 mr-2" />
+//                 Generate Referral Link
+//               </Button>
+//             </motion.div>
+//           )}
+//         </motion.section>
+
+//         {/* Fee Percentage Section */}
+//         <motion.section
+//           initial={{ opacity: 0, y: 30 }}
+//           whileInView={{ opacity: 1, y: 0 }}
+//           transition={{ duration: 0.6 }}
+//           className="max-w-2xl mx-auto"
+//         >
+//           <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+//             <CardHeader>
+//               <CardTitle className="text-2xl text-center text-[#86efac] flex items-center justify-center gap-2">
+//                 <TrendingUp className="w-6 h-6" />
+//                 Choose fee for your referral
+//               </CardTitle>
+//             </CardHeader>
+//             <CardContent className="space-y-6">
+//               <div className="space-y-4">
+//                 <Slider
+//                   value={[percentage * 100]}
+//                   onValueChange={(value) => setPercentage(value[0] / 100)}
+//                   min={0.05}
+//                   max={1}
+//                   step={0.001}
+//                   className="w-full"
+//                 />
+
+//                 <div className="text-center space-y-2">
+//                   <div className="text-3xl font-bold text-[#86efac]">
+//                     {(percentage * 100).toFixed(3)}%
+//                   </div>
+
+//                   <div className="flex items-center justify-center gap-4 text-sm">
+//                     <Badge
+//                       variant="outline"
+//                       className="border-[#86efac]/30 text-[#86efac]"
+//                     >
+//                       Gross: ${(10000 * percentage).toFixed(2)}
+//                     </Badge>
+//                     <Badge
+//                       variant="outline"
+//                       className="border-gray-600 text-gray-400"
+//                     >
+//                       Net (70%): ${(10000 * percentage * 0.7).toFixed(2)}
+//                     </Badge>
+//                   </div>
+
+//                   <p className="text-gray-400">
+//                     {isNewUser
+//                       ? "Set your earnings rate to kickstart referrals!"
+//                       : `If your referral trades $10,000, you'll earn $${(
+//                           10000 *
+//                           percentage *
+//                           0.7
+//                         ).toFixed(2)}`}
+//                   </p>
+//                 </div>
+//               </div>
+
+//               <Button
+//                 onClick={savePercentage}
+//                 disabled={!referralCode}
+//                 className="w-full bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium"
+//               >
+//                 <Save className="w-4 h-4 mr-2" />
+//                 Save Percentage
+//               </Button>
+//             </CardContent>
+//           </Card>
+//         </motion.section>
+
+//         {/* Stats Section */}
+//         <motion.section
+//           initial={{ opacity: 0, y: 30 }}
+//           whileInView={{ opacity: 1, y: 0 }}
+//           transition={{ duration: 0.6 }}
+//           className="space-y-8"
+//         >
+//           <h2 className="text-3xl font-bold text-center">
+//             Your Referral Stats
+//           </h2>
+
+//           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+//             {[
+//               {
+//                 label: "Total Referrals",
+//                 value: isNewUser ? "0" : stats.referrals.toString(),
+//                 icon: Users,
+//                 color: "text-blue-400",
+//                 bgColor: "bg-blue-400/10",
+//               },
+//               {
+//                 label: "Total Earnings",
+//                 value: isNewUser ? "$0" : `$${stats.earnings}`,
+//                 icon: DollarSign,
+//                 color: "text-[#86efac]",
+//                 bgColor: "bg-[#86efac]/10",
+//               },
+//               {
+//                 label: "Pending Earnings",
+//                 value: isNewUser ? "$0" : `$${stats.pending}`,
+//                 icon: Clock,
+//                 color: "text-yellow-400",
+//                 bgColor: "bg-yellow-400/10",
+//               },
+//             ].map((stat, i) => (
+//               <motion.div
+//                 key={i}
+//                 initial={{ scale: 0.9, opacity: 0 }}
+//                 whileInView={{ scale: 1, opacity: 1 }}
+//                 whileHover={{ scale: 1.02 }}
+//                 transition={{ duration: 0.5, delay: i * 0.1 }}
+//               >
+//                 <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800 hover:border-gray-700 transition-colors">
+//                   <CardContent className="p-6">
+//                     <div className="flex items-center gap-4">
+//                       <div className={`p-3 rounded-xl ${stat.bgColor}`}>
+//                         <stat.icon className={`w-6 h-6 ${stat.color}`} />
+//                       </div>
+//                       <div>
+//                         <p className="text-sm text-gray-400 font-medium">
+//                           {stat.label}
+//                         </p>
+//                         <p className="text-2xl font-bold">{stat.value}</p>
+//                       </div>
+//                     </div>
+//                   </CardContent>
+//                 </Card>
+//               </motion.div>
+//             ))}
+//           </div>
+
+//           {/* Chart */}
+//           <div className="max-w-4xl mx-auto">
+//             {isNewUser || history.length === 0 ? (
+//               <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+//                 <CardContent className="p-12 text-center">
+//                   <TrendingUp className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+//                   <h3 className="text-xl font-semibold text-gray-400 mb-2">
+//                     No Earnings Yet
+//                   </h3>
+//                   <p className="text-gray-500 mb-6">
+//                     Share your referral code to see your earnings growth!
+//                   </p>
+//                   {!referralCode && (
+//                     <Button
+//                       onClick={() => {
+//                         if (!connected || !walletAddress) {
+//                           toast.error("Connect your wallet to start earning!");
+//                           return;
+//                         }
+//                         setShowModal(true);
+//                       }}
+//                       className="bg-[#86efac] text-black hover:bg-[#86efac]/90"
+//                     >
+//                       Generate Code Now
+//                     </Button>
+//                   )}
+//                 </CardContent>
+//               </Card>
+//             ) : (
+//               <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+//                 <CardHeader>
+//                   <CardTitle className="text-xl text-center">
+//                     Earnings Over Time
+//                   </CardTitle>
+//                 </CardHeader>
+//                 <CardContent>
+//                   <canvas id="earningsChart" height="200" className="w-full" />
+//                 </CardContent>
+//               </Card>
+//             )}
+//           </div>
+//         </motion.section>
+
+//         {/* Leaderboard */}
+//         <motion.section
+//           initial={{ opacity: 0, y: 30 }}
+//           whileInView={{ opacity: 1, y: 0 }}
+//           transition={{ duration: 0.6 }}
+//           className="max-w-2xl mx-auto"
+//         >
+//           <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+//             <CardHeader>
+//               <CardTitle className="text-2xl text-center text-[#86efac] flex items-center justify-center gap-2">
+//                 <Award className="w-6 h-6" />
+//                 Top Referrers
+//               </CardTitle>
+//             </CardHeader>
+//             <CardContent>
+//               {isNewUser || leaderboardData.length === 0 ? (
+//                 <div className="text-center py-8">
+//                   <Award className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+//                   <h3 className="text-lg font-semibold text-gray-400 mb-2">
+//                     Be the First Top Referrer!
+//                   </h3>
+//                   <p className="text-gray-500">
+//                     Invite friends to climb the leaderboard.
+//                   </p>
+//                 </div>
+//               ) : (
+//                 <div className="space-y-3">
+//                   {leaderboardData.map((entry, i) => (
+//                     <motion.div
+//                       key={i}
+//                       initial={{ x: 50, opacity: 0 }}
+//                       whileInView={{ x: 0, opacity: 1 }}
+//                       transition={{ duration: 0.5, delay: i * 0.1 }}
+//                       className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg border-l-4 border-[#86efac]"
+//                     >
+//                       <div className="w-8 h-8 bg-[#86efac]/20 rounded-full flex items-center justify-center text-[#86efac] font-bold">
+//                         {i + 1}
+//                       </div>
+//                       <div className="flex-1">
+//                         <p className="font-medium">{entry.name}</p>
+//                         <p className="text-sm text-gray-400">
+//                           {entry.referrals} referrals
+//                         </p>
+//                       </div>
+//                     </motion.div>
+//                   ))}
+//                 </div>
+//               )}
+//             </CardContent>
+//           </Card>
+//         </motion.section>
+
+//         {/* Referral History */}
+//         <motion.section
+//           initial={{ opacity: 0, y: 30 }}
+//           whileInView={{ opacity: 1, y: 0 }}
+//           transition={{ duration: 0.6 }}
+//           className="max-w-4xl mx-auto"
+//         >
+//           <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+//             <CardHeader>
+//               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+//                 <CardTitle className="text-2xl text-[#86efac]">
+//                   Referral History
+//                 </CardTitle>
+//                 <div className="flex gap-2">
+//                   {["Date", "Earnings"].map((filter) => (
+//                     <Button
+//                       key={filter}
+//                       variant="outline"
+//                       size="sm"
+//                       onClick={() => toast(`Sorting by ${filter} coming soon!`)}
+//                       className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50"
+//                     >
+//                       <ListFilter className="w-4 h-4 mr-1" />
+//                       {filter}
+//                     </Button>
+//                   ))}
+//                 </div>
+//               </div>
+//             </CardHeader>
+//             <CardContent>
+//               {historyData.length === 0 ? (
+//                 <div className="text-center py-12">
+//                   <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+//                   <h3 className="text-xl font-semibold text-gray-400 mb-2">
+//                     No Referrals Yet
+//                   </h3>
+//                   <p className="text-gray-500 mb-6">
+//                     Invite friends to start building your referral history!
+//                   </p>
+//                   {!referralCode && (
+//                     <Button
+//                       onClick={() => {
+//                         if (!connected || !walletAddress) {
+//                           toast.error(
+//                             "Connect your wallet to unlock the power of referrals!"
+//                           );
+//                           return;
+//                         }
+//                         setShowModal(true);
+//                       }}
+//                       className="bg-[#86efac] text-black hover:bg-[#86efac]/90"
+//                     >
+//                       Get Your Code
+//                     </Button>
+//                   )}
+//                 </div>
+//               ) : (
+//                 <div className="space-y-3">
+//                   {historyData.map((entry) => (
+//                     <motion.div
+//                       key={entry.id}
+//                       initial={{ height: 0, opacity: 0 }}
+//                       animate={{ height: "auto", opacity: 1 }}
+//                       transition={{ duration: 0.5 }}
+//                       className={`p-4 rounded-lg border-l-4 ${
+//                         entry.status === "ACTIVE"
+//                           ? "bg-[#86efac]/5 border-[#86efac]"
+//                           : "bg-gray-800/30 border-gray-600"
+//                       }`}
+//                     >
+//                       <div className="flex justify-between items-start">
+//                         <div>
+//                           <p className="font-medium">{entry.name}</p>
+//                           <p className="text-sm text-gray-400">
+//                             Joined {new Date(entry.date).toLocaleDateString()}
+//                           </p>
+//                         </div>
+//                         <div className="text-right">
+//                           <p className="font-semibold text-[#86efac]">
+//                             ${entry.earnings}
+//                           </p>
+//                           <Badge
+//                             variant={
+//                               entry.status === "ACTIVE"
+//                                 ? "default"
+//                                 : "secondary"
+//                             }
+//                             className={
+//                               entry.status === "ACTIVE"
+//                                 ? "bg-[#86efac]/20 text-[#86efac]"
+//                                 : ""
+//                             }
+//                           >
+//                             {entry.status}
+//                           </Badge>
+//                         </div>
+//                       </div>
+//                     </motion.div>
+//                   ))}
+//                 </div>
+//               )}
+//             </CardContent>
+//           </Card>
+//         </motion.section>
+
+//         {/* Rewards Section */}
+//         <motion.section
+//           initial={{ opacity: 0, y: 30 }}
+//           whileInView={{ opacity: 1, y: 0 }}
+//           transition={{ duration: 0.6 }}
+//           className="max-w-2xl mx-auto"
+//         >
+//           <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
+//             <CardHeader>
+//               <CardTitle className="text-2xl text-center text-[#86efac] flex items-center justify-center gap-2">
+//                 <Award className="w-6 h-6" />
+//                 Rewards & Milestones
+//               </CardTitle>
+//             </CardHeader>
+//             <CardContent className="space-y-6">
+//               <div className="text-center space-y-4">
+//                 <p className="text-gray-400">
+//                   {isNewUser
+//                     ? "Make your first referral to unlock rewards!"
+//                     : `${stats.referrals}/5 Referrals for Bronze Badge`}
+//                 </p>
+
+//                 <div className="w-full bg-gray-800 rounded-full h-3">
+//                   <motion.div
+//                     initial={{ width: 0 }}
+//                     animate={{
+//                       width: `${Math.min((stats.referrals / 5) * 100, 100)}%`,
+//                     }}
+//                     transition={{ duration: 1, delay: 0.5 }}
+//                     className="bg-gradient-to-r from-[#86efac] to-[#22c55e] h-3 rounded-full"
+//                   />
+//                 </div>
+
+//                 <div className="flex justify-between text-sm text-gray-500">
+//                   <span>0</span>
+//                   <span>5 referrals</span>
+//                 </div>
+//               </div>
+
+//               <Button
+//                 onClick={claimNFT}
+//                 disabled={stats.referrals < 5}
+//                 className={`w-full font-medium ${
+//                   stats.referrals >= 5
+//                     ? "bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90"
+//                     : "bg-gray-800 text-gray-500 cursor-not-allowed"
+//                 }`}
+//               >
+//                 <Award className="w-4 h-4 mr-2" />
+//                 {stats.referrals >= 5
+//                   ? "Claim Bronze NFT"
+//                   : "Bronze NFT Locked"}
+//               </Button>
+//             </CardContent>
+//           </Card>
+//         </motion.section>
+//       </div>
+
+//       {/* Modal */}
+//       {showModal && (
+//         <motion.div
+//           initial={{ opacity: 0 }}
+//           animate={{ opacity: 1 }}
+//           exit={{ opacity: 0 }}
+//           className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+//         >
+//           <motion.div
+//             initial={{ scale: 0.9, opacity: 0 }}
+//             animate={{ scale: 1, opacity: 1 }}
+//             exit={{ scale: 0.9, opacity: 0 }}
+//             className="w-full max-w-md"
+//           >
+//             <Card className="bg-gray-900 border-gray-800 relative">
+//               <Button
+//                 onClick={closeModal}
+//                 variant="ghost"
+//                 size="sm"
+//                 className="absolute top-4 right-4 text-gray-400 hover:text-white"
+//               >
+//                 <X className="w-4 h-4" />
+//               </Button>
+
+//               {modalStep === 1 && (
+//                 <motion.div
+//                   initial={{ x: -20, opacity: 0 }}
+//                   animate={{ x: 0, opacity: 1 }}
+//                   transition={{ duration: 0.3 }}
+//                 >
+//                   <CardHeader className="text-center space-y-4">
+//                     <div className="w-16 h-16 bg-[#86efac]/20 rounded-full flex items-center justify-center mx-auto">
+//                       <Sparkles className="w-8 h-8 text-[#86efac]" />
+//                     </div>
+//                     <CardTitle className="text-2xl">
+//                       Start Earning with Referrals!
+//                     </CardTitle>
+//                   </CardHeader>
+//                   <CardContent className="space-y-6">
+//                     <p className="text-gray-400 text-center">
+//                       Invite friends and earn a percentage of their transactions
+//                       on Deserialize.
+//                     </p>
+//                     <Button
+//                       onClick={() => setModalStep(2)}
+//                       className="w-full bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium"
+//                     >
+//                       Continue
+//                     </Button>
+//                   </CardContent>
+//                 </motion.div>
+//               )}
+
+//               {modalStep === 2 && (
+//                 <motion.div
+//                   initial={{ x: 20, opacity: 0 }}
+//                   animate={{ x: 0, opacity: 1 }}
+//                   transition={{ duration: 0.3 }}
+//                 >
+//                   <CardHeader className="text-center">
+//                     <CardTitle className="text-2xl">
+//                       Customize Your Code
+//                     </CardTitle>
+//                   </CardHeader>
+//                   <CardContent className="space-y-6">
+//                     <div className="space-y-2">
+//                       <Input
+//                         value={customCode}
+//                         onChange={(e) => setCustomCode(e.target.value)}
+//                         placeholder="Enter custom referral code (optional)"
+//                         className="bg-gray-800 border-gray-700 text-white focus:border-[#86efac] focus:ring-[#86efac]/20"
+//                       />
+//                       <p className="text-sm text-gray-400">
+//                         {customCode
+//                           ? "Custom code available!"
+//                           : "Leave empty for auto-generated code, or enter 3-10 alphanumeric characters"}
+//                       </p>
+//                     </div>
+//                     <Button
+//                       onClick={generateReferralCode}
+//                       className="w-full bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium"
+//                     >
+//                       Generate Referral Code
+//                     </Button>
+//                   </CardContent>
+//                 </motion.div>
+//               )}
+//             </Card>
+//           </motion.div>
+//         </motion.div>
+//       )}
+
+//       {/* FAQ Button */}
+//       <motion.div
+//         initial={{ scale: 0 }}
+//         animate={{ scale: 1 }}
+//         whileHover={{ scale: 1.1 }}
+//         className="fixed bottom-6 right-6 z-40"
+//       >
+//         <Button
+//           onClick={() => setShowFAQ(!showFAQ)}
+//           className="bg-[#86efac] text-black hover:bg-[#86efac]/90 rounded-full w-14 h-14 shadow-lg shadow-[#86efac]/25"
+//         >
+//           <HelpCircle className="w-6 h-6" />
+//         </Button>
+//       </motion.div>
+
+//       {/* FAQ Panel */}
+//       {showFAQ && (
+//         <motion.div
+//           initial={{ opacity: 0, y: 20, scale: 0.95 }}
+//           animate={{ opacity: 1, y: 0, scale: 1 }}
+//           exit={{ opacity: 0, y: 20, scale: 0.95 }}
+//           className="fixed bottom-24 right-6 w-80 max-w-[calc(100vw-3rem)] z-40"
+//         >
+//           <Card className="bg-gray-900 border-gray-800 shadow-xl">
+//             <CardHeader>
+//               <CardTitle className="text-lg text-[#86efac]">
+//                 Frequently Asked Questions
+//               </CardTitle>
+//             </CardHeader>
+//             <CardContent>
+//               <Accordion type="single" collapsible>
+//                 {faqsData.map((faq, i) => (
+//                   <AccordionItem
+//                     key={i}
+//                     value={`item-${i}`}
+//                     className="border-gray-800"
+//                   >
+//                     <AccordionTrigger className="text-[#86efac] hover:text-[#86efac]/80">
+//                       {faq.question}
+//                     </AccordionTrigger>
+//                     <AccordionContent className="text-gray-400">
+//                       {faq.answer}
+//                     </AccordionContent>
+//                   </AccordionItem>
+//                 ))}
+//               </Accordion>
+//             </CardContent>
+//           </Card>
+//         </motion.div>
+//       )}
+//     </div>
+//   );
+// };
+
+// export default ReferralDashboard;
