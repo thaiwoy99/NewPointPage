@@ -83,7 +83,7 @@ export async function fetchUmbraStats(
       },
     };
   }
-
+  //
   return {
     name: "Umbra",
     logo: "https://umbra.finance/favicon.png",
@@ -475,15 +475,15 @@ export async function fetchWerm(
 export async function fetchAstrol(
   address: string | null
 ): Promise<ProtocolStats> {
-    if (!address) {
-      return {
-        name: "Astrol",
-        logo: "https://pbs.twimg.com/profile_images/1864015389144838144/ZvK6Wlx0_400x400.jpg",
-        points: 0,
-        rank: 0,
-        description: "Asset Productivity Layer of Eclipse",
-      };
-    }
+  if (!address) {
+    return {
+      name: "Astrol",
+      logo: "https://pbs.twimg.com/profile_images/1864015389144838144/ZvK6Wlx0_400x400.jpg",
+      points: 0,
+      rank: 0,
+      description: "Asset Productivity Layer of Eclipse",
+    };
+  }
   const res = await fetch(
     `https://corsproxy.io/?https://app.astrol.io/api/points?userWallet=${address}`,
     {
@@ -564,33 +564,33 @@ export async function fetchScope(address: string): Promise<ProtocolStats> {
 }
 
 export async function fetchSoe(address: string | null, twitterUsername: string | null): Promise<ProtocolStats> {
-console.log("SOE", twitterUsername);
-    if (!twitterUsername) {
-      // If User Not found, we assign default bottom values to them
-      return {
-        name: "SOE",
-        logo: "https://pbs.twimg.com/profile_images/1874763677900886016/D7dgORxl_400x400.jpg",
-        points: 0,
-        rank: 0,
-        description: "The first NFT collection on Eclipse",
-        extra: {
-          hyperactivePercent: {
-            value: 0,
-            url: "https://soetheagent.com/",
-          },
-          teacherPercent: {
-            value: 0,
-            url: "https://soetheagent.com/",
-          },
-          yapperPercent: {
-            value: 0,
-            url: "https://soetheagent.com/",
-          },
+  console.log("SOE", twitterUsername);
+  if (!twitterUsername) {
+    // If User Not found, we assign default bottom values to them
+    return {
+      name: "SOE",
+      logo: "https://pbs.twimg.com/profile_images/1874763677900886016/D7dgORxl_400x400.jpg",
+      points: 0,
+      rank: 0,
+      description: "The first NFT collection on Eclipse",
+      extra: {
+        hyperactivePercent: {
+          value: 0,
+          url: "https://soetheagent.com/",
         },
-        requiresTwitter: true,
-        comingSoon: true,
-      };
-    }
+        teacherPercent: {
+          value: 0,
+          url: "https://soetheagent.com/",
+        },
+        yapperPercent: {
+          value: 0,
+          url: "https://soetheagent.com/",
+        },
+      },
+      requiresTwitter: true,
+      comingSoon: true,
+    };
+  }
 
   const res = await fetch("https://api.soetheagent.com/api/leaderboard");
   const { data } = await res.json();
@@ -635,7 +635,7 @@ console.log("SOE", twitterUsername);
   }
 
   console.log('userIndex', data[userIndex])
-  
+
 
   return {
     name: "SOE",
@@ -1026,26 +1026,26 @@ export async function fetchRollItUp(address: string): Promise<ProtocolStats> {
 export async function fetchMoonlaunch(
   address: string | null
 ): Promise<ProtocolStats> {
-//       if (!address) {
-//         return {
-//           name: "Moonlaunch",
-//           logo: "https://pbs.twimg.com/profile_images/1873935722950123521/-zO3SgqT_400x400.jpg",
-//           points: 0,
-//           rank: 0,
-//           description: "AMM on Solana with concentrated liquidity",
-//         };
-//       }
+  //       if (!address) {
+  //         return {
+  //           name: "Moonlaunch",
+  //           logo: "https://pbs.twimg.com/profile_images/1873935722950123521/-zO3SgqT_400x400.jpg",
+  //           points: 0,
+  //           rank: 0,
+  //           description: "AMM on Solana with concentrated liquidity",
+  //         };
+  //       }
 
-// const res = await fetch(
-//   `https://corsproxy.io/?https://api.moonlaunch.fun/api/users/user-rankings?address=vQSDW6FTh7wB7EWnB66SD67ZixmPjPjV7EpzZhzwKvC`,
-//   {
-//     method: "GET",
-//   }
-// );
+  // const res = await fetch(
+  //   `https://corsproxy.io/?https://api.moonlaunch.fun/api/users/user-rankings?address=vQSDW6FTh7wB7EWnB66SD67ZixmPjPjV7EpzZhzwKvC`,
+  //   {
+  //     method: "GET",
+  //   }
+  // );
 
 
-//   const user = await res.json();
-//   console.log("datw moon launch", user);
+  //   const user = await res.json();
+  //   console.log("datw moon launch", user);
 
   return {
     name: "Moonlaunch",
