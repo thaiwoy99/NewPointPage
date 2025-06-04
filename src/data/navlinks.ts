@@ -29,6 +29,11 @@ export const NavLinks = [
     link: "/incentive",
     tag: "New",
   },
+  {
+    name: "Referral",
+    link: "/referral",
+    tag: "New",
+  },
   // {
   //   name: "Points",
   //   link: "https://points.deserialize.xyz",
