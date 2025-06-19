@@ -9,20 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import Chart from "chart.js/auto";
 import confetti from "canvas-confetti";
 import QRCode from "qrcode";
 import { Toaster, toast } from "react-hot-toast";
 import { useAppContext } from "@/context/AppWalletProvider";
 import {
-  X,
-  HelpCircle,
   Save,
   Award,
   Share2,
@@ -30,7 +22,6 @@ import {
   TrendingUp,
   Users,
   DollarSign,
-  Clock,
   Sparkles,
   LinkIcon,
   QrCode,
@@ -62,42 +53,46 @@ interface UserReferralData {
   referralCode: string | null;
   defaultReferralPercentage: number;
   referrals: number;
+  referralPointsTotal?: number; // Optional for new users
   earnings: number;
   pending: number;
+  points: number;
 }
 
 const SkeletonLoader: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden">
-      {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(134,239,172,0.1),transparent_50%)]" />
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+      {/* Enhanced background with subtle patterns */}
+      <div className="absolute inset-0 bg-black">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(134,239,172,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(134,239,172,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(134,239,172,0.08),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(134,239,172,0.06),transparent_50%)]" />
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 py-12 space-y-12">
+      <div className="relative z-10 container mx-auto px-6 py-16 space-y-16">
         {/* Hero Skeleton */}
-        <div className="text-center space-y-6">
-          <div className="h-12 w-96 mx-auto bg-gray-800 animate-pulse rounded-lg" />
-          <div className="h-6 w-64 mx-auto bg-gray-800 animate-pulse rounded-lg" />
-          <div className="h-14 w-80 mx-auto bg-gray-800 animate-pulse rounded-lg" />
+        <div className="text-center space-y-8">
+          <div className="h-16 w-[500px] mx-auto bg-gradient-to-r from-gray-800/50 to-gray-700/50 animate-pulse rounded-2xl" />
+          <div className="h-8 w-80 mx-auto bg-gradient-to-r from-gray-800/50 to-gray-700/50 animate-pulse rounded-xl" />
+          <div className="h-16 w-96 mx-auto bg-gradient-to-r from-gray-800/50 to-gray-700/50 animate-pulse rounded-2xl" />
         </div>
 
         {/* Stats Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          {[1, 2].map((i) => (
             <div
               key={i}
-              className="bg-gray-900/50 border border-gray-800 rounded-xl p-6"
+              className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl border border-gray-700/50 rounded-3xl p-8 shadow-2xl"
             >
-              <div className="h-6 w-24 bg-gray-800 animate-pulse rounded mb-4" />
-              <div className="h-8 w-16 bg-gray-800 animate-pulse rounded" />
+              <div className="h-8 w-32 bg-gradient-to-r from-gray-700/50 to-gray-600/50 animate-pulse rounded-xl mb-6" />
+              <div className="h-12 w-24 bg-gradient-to-r from-gray-700/50 to-gray-600/50 animate-pulse rounded-xl" />
             </div>
           ))}
         </div>
 
         {/* Chart Skeleton */}
-        <div className="max-w-4xl mx-auto">
-          <div className="h-64 bg-gray-900/50 border border-gray-800 rounded-xl animate-pulse" />
+        <div className="max-w-5xl mx-auto">
+          <div className="h-80 bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl border border-gray-700/50 rounded-3xl animate-pulse shadow-2xl" />
         </div>
       </div>
     </div>
@@ -123,7 +118,7 @@ const ReferralDashboard: React.FC = () => {
   const { walletAddress, connecting, connected } = useAppContext();
 
   // Demo data
-  const demoStats = { referrals: 5, earnings: 50, pending: 10 };
+  const demoStats = { referrals: 5, earnings: 50, pending: 10, points: 1250 };
   const demoFAQs: FAQ[] = [
     {
       question: "How do referrals work?",
@@ -139,7 +134,7 @@ const ReferralDashboard: React.FC = () => {
 
   const isNewUser = !connected;
   const stats = isNewUser
-    ? { referrals: 0, earnings: 0, pending: 0 }
+    ? { referrals: 0, earnings: 0, pending: 0, points: 0, referralPointsTotal: 0 }
     : userReferralData || demoStats;
   const historyData = isNewUser || history.length === 0 ? [] : history;
   const leaderboardData =
@@ -174,6 +169,8 @@ const ReferralDashboard: React.FC = () => {
         }
         const statsData = await statsResponse.json();
 
+        console.log("Stats Data:", statsData);
+
         const historyResponse = await fetch(
           `/api/referrals/history?walletAddress=${walletAddress}`
         );
@@ -195,9 +192,11 @@ const ReferralDashboard: React.FC = () => {
         const combinedData = {
           referralCode: userData.referralCode,
           defaultReferralPercentage: userData.defaultReferralPercentage / 100,
+          referralPointsTotal: statsData.referralPointsTotal,
           referrals: statsData.referrals,
           earnings: statsData.earnings,
           pending: statsData.pending,
+          points: connected ? 1250 + statsData.referrals * 50 : 0, // Hardcoded formula
         };
 
         setUserReferralData(combinedData);
@@ -209,13 +208,19 @@ const ReferralDashboard: React.FC = () => {
         console.error("Failed to fetch data:", error);
         toast.custom((t) => (
           <div
-            className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+            className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
               t.visible ? "animate-enter" : "animate-leave"
             }`}
-            style={{ background: "#86efac", color: "#000" }}
+            style={{
+              background: "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+              color: "#000",
+              border: "1px solid rgba(134, 239, 172, 0.3)",
+            }}
           >
-            <AlertCircle size={20} color="#000" />
-            <span>{error.message || "Failed to fetch data."}</span>
+            <AlertCircle size={22} color="#000" />
+            <span className="font-medium">
+              {error.message || "Failed to fetch data."}
+            </span>
           </div>
         ));
         setUserReferralData({
@@ -224,6 +229,7 @@ const ReferralDashboard: React.FC = () => {
           referrals: demoStats.referrals,
           earnings: demoStats.earnings,
           pending: demoStats.pending,
+          points: demoStats.points,
         });
         setHistory([]);
         setLeaderboard([]);
@@ -267,21 +273,21 @@ const ReferralDashboard: React.FC = () => {
       pulseScale: number;
     }
 
-    const particles: Particle[] = Array.from({ length: 120 }, () => {
-      const isCircle = Math.random() < 0.7;
+    const particles: Particle[] = Array.from({ length: 100 }, () => {
+      const isCircle = Math.random() < 0.8;
       return {
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        radius: isCircle ? Math.random() * 2 + 1 : undefined,
-        length: !isCircle ? Math.random() * 3 + 2 : undefined,
+        radius: isCircle ? Math.random() * 1.5 + 0.5 : undefined,
+        length: !isCircle ? Math.random() * 2.5 + 1.5 : undefined,
         rotation: !isCircle ? Math.random() * Math.PI * 2 : undefined,
-        vx: Math.random() * 0.5 - 0.25,
-        vy: Math.random() * 0.5 - 0.25,
-        opacity: Math.random() * 0.6 + 0.3,
+        vx: Math.random() * 0.4 - 0.2,
+        vy: Math.random() * 0.4 - 0.2,
+        opacity: Math.random() * 0.4 + 0.2,
         type: isCircle ? "circle" : "line",
-        wave: Math.random() < 0.2 && isCircle,
+        wave: Math.random() < 0.25 && isCircle,
         waveOffset: Math.random() * Math.PI * 2,
-        pulse: Math.random() < 0.1 && isCircle,
+        pulse: Math.random() < 0.15 && isCircle,
         pulseScale: 1,
       };
     });
@@ -297,7 +303,7 @@ const ReferralDashboard: React.FC = () => {
     const animate = (time: number) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw connection lines
+      // Draw connection lines with enhanced styling
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const p1 = particles[i],
@@ -305,60 +311,81 @@ const ReferralDashboard: React.FC = () => {
           const dx = p1.x - p2.x,
             dy = p1.y - p2.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 100) {
+          if (dist < 120) {
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `rgba(134, 239, 172, ${0.4 * (1 - dist / 100)})`;
-            ctx.lineWidth = 0.5;
+            const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+            gradient.addColorStop(
+              0,
+              `rgba(134, 239, 172, ${0.3 * (1 - dist / 120)})`
+            );
+            gradient.addColorStop(
+              1,
+              `rgba(34, 197, 94, ${0.2 * (1 - dist / 120)})`
+            );
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 0.8;
             ctx.stroke();
           }
         }
       }
 
-      // Update and draw particles
+      // Update and draw particles with enhanced effects
       particles.forEach((p) => {
-        // Mouse interaction
+        // Enhanced mouse interaction
         const dx = mouseX - p.x,
           dy = mouseY - p.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         let currentOpacity = p.opacity;
-        if (dist < 150) {
-          p.vx += (dx / dist) * 0.02;
-          p.vy += (dy / dist) * 0.02;
+        if (dist < 180) {
+          p.vx += (dx / dist) * 0.015;
+          p.vy += (dy / dist) * 0.015;
           currentOpacity = Math.min(
             0.9,
-            p.opacity + ((150 - dist) / 150) * 0.4
+            p.opacity + ((180 - dist) / 180) * 0.5
           );
         }
 
-        // Update position
+        // Update position with enhanced movement
         p.x += p.vx;
         p.y += p.vy;
         if (p.wave) {
-          p.y += Math.sin(time / 1000 + p.waveOffset) * 0.5;
+          p.y += Math.sin(time / 1200 + p.waveOffset) * 0.8;
         }
         if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
         if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-        p.vx = Math.max(-0.5, Math.min(0.5, p.vx));
-        p.vy = Math.max(-0.5, Math.min(0.5, p.vy));
+        p.vx = Math.max(-0.6, Math.min(0.6, p.vx));
+        p.vy = Math.max(-0.6, Math.min(0.6, p.vy));
 
-        // Pulse effect
+        // Enhanced pulse effect
         if (p.pulse) {
-          p.pulseScale = 0.8 + Math.sin(time / 500) * 0.2;
+          p.pulseScale = 0.7 + Math.sin(time / 600) * 0.3;
         }
 
-        // Draw particle
+        // Draw particle with enhanced styling
         ctx.beginPath();
         if (p.type === "circle") {
-          ctx.arc(
+          const radius = p.radius! * (p.pulse ? p.pulseScale : 1);
+          ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+
+          // Create radial gradient for glow effect
+          const gradient = ctx.createRadialGradient(
             p.x,
             p.y,
-            p.radius! * (p.pulse ? p.pulseScale : 1),
             0,
-            Math.PI * 2
+            p.x,
+            p.y,
+            radius * 2
           );
-          ctx.fillStyle = `rgba(134, 239, 172, ${currentOpacity})`;
+          gradient.addColorStop(0, `rgba(134, 239, 172, ${currentOpacity})`);
+          gradient.addColorStop(
+            0.7,
+            `rgba(134, 239, 172, ${currentOpacity * 0.5})`
+          );
+          gradient.addColorStop(1, `rgba(134, 239, 172, 0)`);
+
+          ctx.fillStyle = gradient;
           ctx.fill();
         } else {
           const x2 = p.x + Math.cos(p.rotation!) * p.length!;
@@ -366,7 +393,8 @@ const ReferralDashboard: React.FC = () => {
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(x2, y2);
           ctx.strokeStyle = `rgba(134, 239, 172, ${currentOpacity})`;
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 1.2;
+          ctx.lineCap = "round";
           ctx.stroke();
         }
       });
@@ -466,13 +494,19 @@ const ReferralDashboard: React.FC = () => {
     if (!connected || !walletAddress) {
       toast.custom((t) => (
         <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+          className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
             t.visible ? "animate-enter" : "animate-leave"
           }`}
-          style={{ background: "#86efac", color: "#000" }}
+          style={{
+            background: "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+            color: "#000",
+            border: "1px solid rgba(134, 239, 172, 0.3)",
+          }}
         >
-          <Wallet size={20} color="#000" />
-          <span>Connect your wallet to unlock the power of referrals!</span>
+          <Wallet size={22} color="#000" />
+          <span className="font-medium">
+            Connect your wallet to unlock the power of referrals!
+          </span>
         </div>
       ));
       return;
@@ -497,33 +531,43 @@ const ReferralDashboard: React.FC = () => {
       setModalStep(1);
       setCustomCode("");
       confetti({
-        particleCount: 150,
-        spread: 70,
+        particleCount: 200,
+        spread: 80,
         origin: { y: 0.6 },
-        colors: ["#86efac"],
+        colors: ["#86efac", "#22c55e", "#16a34a"],
       });
       toast.custom((t) => (
         <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+          className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
             t.visible ? "animate-enter" : "animate-leave"
           }`}
-          style={{ background: "#86efac", color: "#000" }}
+          style={{
+            background: "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+            color: "#000",
+            border: "1px solid rgba(134, 239, 172, 0.3)",
+          }}
         >
-          <Save size={20} color="#000" />
-          <span>Referral code generated!</span>
+          <Save size={22} color="#000" />
+          <span className="font-medium">Referral code generated!</span>
         </div>
       ));
     } catch (error: any) {
       console.error("Failed to generate referral code:", error);
       toast.custom((t) => (
         <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+          className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
             t.visible ? "animate-enter" : "animate-leave"
           }`}
-          style={{ background: "#FFA500", color: "#000" }}
+          style={{
+            background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+            color: "#000",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+          }}
         >
-          <AlertCircle size={20} color="#000" />
-          <span>{error.message || "Failed to generate referral code."}</span>
+          <AlertCircle size={22} color="#000" />
+          <span className="font-medium">
+            {error.message || "Failed to generate referral code."}
+          </span>
         </div>
       ));
     } finally {
@@ -536,13 +580,19 @@ const ReferralDashboard: React.FC = () => {
     if (!connected || !walletAddress) {
       toast.custom((t) => (
         <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+          className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
             t.visible ? "animate-enter" : "animate-leave"
           }`}
-          style={{ background: "#86efac", color: "#000" }}
+          style={{
+            background: "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+            color: "#000",
+            border: "1px solid rgba(134, 239, 172, 0.3)",
+          }}
         >
-          <Wallet size={20} color="#000" />
-          <span>Connect your wallet to unlock the power of referrals!</span>
+          <Wallet size={22} color="#000" />
+          <span className="font-medium">
+            Connect your wallet to unlock the power of referrals!
+          </span>
         </div>
       ));
       return;
@@ -564,32 +614,42 @@ const ReferralDashboard: React.FC = () => {
       const { defaultReferralPercentage } = await response.json();
       setPercentage(defaultReferralPercentage);
       confetti({
-        particleCount: 50,
-        spread: 50,
-        colors: ["#86efac"],
+        particleCount: 80,
+        spread: 60,
+        colors: ["#86efac", "#22c55e"],
       });
       toast.custom((t) => (
         <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+          className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
             t.visible ? "animate-enter" : "animate-leave"
           }`}
-          style={{ background: "#86efac", color: "#000" }}
+          style={{
+            background: "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+            color: "#000",
+            border: "1px solid rgba(134, 239, 172, 0.3)",
+          }}
         >
-          <Save size={20} color="#000" />
-          <span>Percentage saved!</span>
+          <Save size={22} color="#000" />
+          <span className="font-medium">Percentage saved!</span>
         </div>
       ));
     } catch (error: any) {
       console.error("Failed to save percentage:", error);
       toast.custom((t) => (
         <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+          className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
             t.visible ? "animate-enter" : "animate-leave"
           }`}
-          style={{ background: "#86efac", color: "#000" }}
+          style={{
+            background: "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+            color: "#000",
+            border: "1px solid rgba(134, 239, 172, 0.3)",
+          }}
         >
-          <AlertCircle size={20} color="#000" />
-          <span>{error.message || "Failed to save percentage."}</span>
+          <AlertCircle size={22} color="#000" />
+          <span className="font-medium">
+            {error.message || "Failed to save percentage."}
+          </span>
         </div>
       ));
     } finally {
@@ -602,13 +662,19 @@ const ReferralDashboard: React.FC = () => {
     if (!connected || !walletAddress) {
       toast.custom((t) => (
         <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+          className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
             t.visible ? "animate-enter" : "animate-leave"
           }`}
-          style={{ background: "#86efac", color: "#000" }}
+          style={{
+            background: "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+            color: "#000",
+            border: "1px solid rgba(134, 239, 172, 0.3)",
+          }}
         >
-          <Wallet size={20} color="#000" />
-          <span>Connect your wallet to unlock the power of referrals!</span>
+          <Wallet size={22} color="#000" />
+          <span className="font-medium">
+            Connect your wallet to unlock the power of referrals!
+          </span>
         </div>
       ));
       return;
@@ -616,13 +682,17 @@ const ReferralDashboard: React.FC = () => {
 
     toast.custom((t) => (
       <div
-        className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+        className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
           t.visible ? "animate-enter" : "animate-leave"
         }`}
-        style={{ background: "#86efac", color: "#000" }}
+        style={{
+          background: "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+          color: "#000",
+          border: "1px solid rgba(134, 239, 172, 0.3)",
+        }}
       >
-        <AlertCircle size={20} color="#000" />
-        <span>NFT claim coming soon!</span>
+        <AlertCircle size={22} color="#000" />
+        <span className="font-medium">NFT claim coming soon!</span>
       </div>
     ));
   };
@@ -632,13 +702,17 @@ const ReferralDashboard: React.FC = () => {
     navigator.clipboard.writeText(text);
     toast.custom((t) => (
       <div
-        className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+        className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
           t.visible ? "animate-enter" : "animate-leave"
         }`}
-        style={{ background: "#86efac", color: "#000" }}
+        style={{
+          background: "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+          color: "#000",
+          border: "1px solid rgba(134, 239, 172, 0.3)",
+        }}
       >
-        <CopyCheck size={20} color="#000" />
-        <span>Copied!</span>
+        <CopyCheck size={22} color="#000" />
+        <span className="font-medium">Copied!</span>
       </div>
     ));
   };
@@ -656,117 +730,127 @@ const ReferralDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black mt-[80px] text-white relative overflow-hidden">
-      {/* Pure dark background with subtle grid pattern */}
+      {/* Enhanced background with professional gradients */}
       <div className="absolute inset-0 bg-black">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(134,239,172,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(134,239,172,0.03)_1px,transparent_1px)] bg-[size:50px_50px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(134,239,172,0.05),transparent_70%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(134,239,172,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(134,239,172,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(134,239,172,0.08),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(134,239,172,0.06),transparent_50%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/50 to-black/80" />
       </div>
 
       <Toaster
         position="bottom-right"
         toastOptions={{
           style: {
-            background: "#1f2937",
-            color: "#f3f4f6",
-            border: "1px solid #374151",
+            background: "transparent",
+            border: "none",
+            boxShadow: "none",
           },
-          duration: 3000,
+          duration: 4000,
         }}
       />
 
-      <canvas ref={canvasRef} className="absolute inset-0 z-0 opacity-60" />
+      <canvas ref={canvasRef} className="absolute inset-0 z-0 opacity-70" />
 
-      {/* Floating orbs animation */}
+      {/* Enhanced floating orbs animation */}
       <div className="absolute inset-0 z-0 overflow-hidden">
-        {[...Array(6)].map((_, i) => (
+        {[...Array(8)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-[#86efac]/10 to-[#22c55e]/5 blur-xl"
+            className="absolute rounded-full blur-2xl"
+            style={{
+              width: `${120 + i * 20}px`,
+              height: `${120 + i * 20}px`,
+              background: `radial-gradient(circle, rgba(134, 239, 172, ${
+                0.1 - i * 0.01
+              }) 0%, rgba(34, 197, 94, ${
+                0.05 - i * 0.005
+              }) 50%, transparent 100%)`,
+              left: `${15 + i * 12}%`,
+              top: `${8 + i * 8}%`,
+            }}
             animate={{
-              x: [0, 100, 0],
-              y: [0, -100, 0],
-              scale: [1, 1.2, 1],
+              x: [0, 120, 0],
+              y: [0, -120, 0],
+              scale: [1, 1.3, 1],
+              rotate: [0, 180, 360],
             }}
             transition={{
-              duration: 10 + i * 2,
+              duration: 12 + i * 3,
               repeat: Number.POSITIVE_INFINITY,
               ease: "easeInOut",
-              delay: i * 2,
-            }}
-            style={{
-              left: `${20 + i * 15}%`,
-              top: `${10 + i * 10}%`,
+              delay: i * 2.5,
             }}
           />
         ))}
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 py-12 space-y-16">
-        {/* Hero Section */}
+      <div className="relative z-10 container mx-auto px-6 py-16 space-y-20">
+        {/* Enhanced Hero Section */}
         <motion.section
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="text-center space-y-8"
+          transition={{ duration: 1, ease: "easeOut" }}
+          className="text-center space-y-12"
         >
-          <div className="space-y-4">
+          <div className="space-y-8">
             <div className="hidden">
               <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#86efac]/10 border border-[#86efac]/20 rounded-full text-[#86efac] text-sm font-medium"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-gray-800/50 to-gray-700/50 backdrop-blur-xl border border-gray-600/50 rounded-full text-gray-100 text-sm font-semibold shadow-2xl"
               >
-                <Sparkles className="w-4 h-4" />
+                <Sparkles className="w-5 h-5" />
                 Deserialize Referral Program
               </motion.div>
             </div>
 
-            <h1 className="text-2xl md:text-7xl font-bold bg-gradient-to-r  from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="text-4xl md:text-8xl font-black bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent leading-tight"
+            >
               Earn on{" "}
-              <span className="bg-gradient-to-r from-[#86efac] to-[#22c55e] bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#86efac] via-[#22c55e] to-[#16a34a] bg-clip-text text-transparent">
                 Deserialize
               </span>
-            </h1>
-            <p className="text-base text-xl">
-              You decide the fees we charge your referrals- we’ll pay you 70% of
-              it!!
-            </p>
+            </motion.h1>
 
             <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed hidden"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="text-xl md:text-2xl text-gray-300 font-medium max-w-3xl mx-auto leading-relaxed"
             >
-              {isNewUser
-                ? "Start by generating your unique referral code to invite friends and earn rewards!"
-                : `Your referrals have earned you $${stats.earnings} so far!`}
+              You decide the fees we charge your referrals- we'll pay you 70% of
+              it!!
             </motion.p>
           </div>
 
           {referralCode ? (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-              className="max-w-2xl mx-auto"
+              transition={{ delay: 0.8, duration: 0.8 }}
+              className="max-w-3xl mx-auto"
             >
-              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8 space-y-6">
-                <h3 className="text-2xl font-semibold text-[#86efac] flex items-center gap-2">
-                  <Share2 className="w-6 h-6" />
+              <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-2xl border border-gray-700/50 rounded-3xl p-10 space-y-8 shadow-2xl">
+                <h3 className="text-3xl font-bold text-[#86efac] flex items-center justify-center gap-3">
+                  <Share2 className="w-8 h-8" />
                   Share Your Referral
                 </h3>
 
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-3">
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row gap-4">
                     <Input
                       value={`${
                         process.env.NEXT_PUBLIC_APP_URL ||
                         "https://www.deserialize.xyz"
                       }/?ref=${referralCode}`}
                       readOnly
-                      className="flex-1 bg-gray-800/50 border-gray-700 text-gray-200 focus:border-[#86efac] focus:ring-[#86efac]/20"
+                      className="flex-1 bg-gray-800/60 backdrop-blur-xl border-gray-600/50 text-gray-100 focus:border-[#86efac] focus:ring-[#86efac]/30 rounded-2xl px-6 py-4 text-lg font-medium shadow-xl"
                     />
                     <Button
                       onClick={() =>
@@ -777,14 +861,14 @@ const ReferralDashboard: React.FC = () => {
                           }/?ref=${referralCode}`
                         )
                       }
-                      className="bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium px-6"
+                      className="bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90 font-bold px-8 py-4 rounded-2xl shadow-2xl transition-all duration-300 hover:scale-105"
                     >
-                      <LinkIcon className="w-4 h-4 mr-2" />
+                      <LinkIcon className="w-5 h-5 mr-2" />
                       Copy Link
                     </Button>
                   </div>
 
-                  <div className="flex flex-wrap justify-center gap-3 hidden">
+                  <div className="flex flex-wrap justify-center gap-4 hidden">
                     {["Twitter", "Telegram", "Discord"].map((platform) => (
                       <Button
                         key={platform}
@@ -792,21 +876,21 @@ const ReferralDashboard: React.FC = () => {
                         onClick={() =>
                           toast(`Share on ${platform} coming soon!`)
                         }
-                        className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50 hover:text-[#86efac]"
+                        className="border-gray-600/50 bg-gray-800/40 backdrop-blur-xl text-gray-200 hover:bg-[#86efac]/10 hover:border-[#86efac]/50 hover:text-[#86efac] rounded-2xl px-6 py-3 font-medium transition-all duration-300"
                       >
                         {platform}
                       </Button>
                     ))}
                   </div>
 
-                  <div className="flex flex-col items-center gap-4 pt-4 hidden">
-                    <canvas id="qrCode" className="rounded-lg" />
+                  <div className="flex flex-col items-center gap-6 pt-6 hidden">
+                    <canvas id="qrCode" className="rounded-2xl shadow-2xl" />
                     <Button
                       onClick={() => toast.success("QR code downloaded!")}
                       variant="outline"
-                      className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50 hover:text-[#86efac]"
+                      className="border-gray-600/50 bg-gray-800/40 backdrop-blur-xl text-gray-200 hover:bg-[#86efac]/10 hover:border-[#86efac]/50 hover:text-[#86efac] rounded-2xl px-6 py-3 font-medium transition-all duration-300"
                     >
-                      <QrCode className="w-4 h-4 mr-2" />
+                      <QrCode className="w-5 h-5 mr-2" />
                       Download QR
                     </Button>
                   </div>
@@ -815,23 +899,29 @@ const ReferralDashboard: React.FC = () => {
             </motion.div>
           ) : (
             <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              animate={{ scale: [1, 1.02, 1] }}
-              transition={{ repeat: Number.POSITIVE_INFINITY, duration: 2 }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.6, duration: 0.8 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               <Button
                 onClick={() => {
                   if (!connected || !walletAddress) {
                     toast.custom((t) => (
                       <div
-                        className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+                        className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
                           t.visible ? "animate-enter" : "animate-leave"
                         }`}
-                        style={{ background: "#86efac", color: "#000" }}
+                        style={{
+                          background:
+                            "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+                          color: "#000",
+                          border: "1px solid rgba(134, 239, 172, 0.3)",
+                        }}
                       >
-                        <Wallet size={20} color="#000" />
-                        <span>
+                        <Wallet size={22} color="#000" />
+                        <span className="font-medium">
                           Connect your wallet to start earning from referrals!
                         </span>
                       </div>
@@ -841,63 +931,53 @@ const ReferralDashboard: React.FC = () => {
                   setShowModal(true);
                 }}
                 size="lg"
-                className="bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90 font-semibold text-lg px-8 py-4 rounded-xl shadow-lg shadow-[#86efac]/25"
+                className="bg-gradient-to-r from-[#86efac] via-[#22c55e] to-[#16a34a] text-black hover:from-[#86efac]/90 hover:via-[#22c55e]/90 hover:to-[#16a34a]/90 font-bold text-xl px-12 py-6 rounded-3xl shadow-2xl transition-all duration-500 hover:shadow-[#86efac]/25"
               >
-                <Sparkles className="w-5 h-5 mr-2" />
+                <Sparkles className="w-6 h-6 mr-3" />
                 Generate Referral Link
               </Button>
             </motion.div>
           )}
         </motion.section>
 
-        {/* Fee Percentage Section */}
+        {/* Enhanced Fee Percentage Section */}
         <motion.section
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="max-w-2xl mx-auto"
+          transition={{ duration: 0.8 }}
+          className="max-w-3xl mx-auto"
         >
-          <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-xl text-center text-[#86efac] flex items-center justify-center gap-2">
-                <TrendingUp className="w-6 h-6" />
+          <Card className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-2xl border border-gray-700/50 rounded-3xl shadow-2xl overflow-hidden">
+            <CardHeader className="pb-8">
+              <CardTitle className="text-3xl text-center text-[#86efac] flex items-center justify-center gap-3 font-bold">
+                <TrendingUp className="w-8 h-8" />
                 Set how much fee we charge your referrals
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <Slider
-                  value={[percentage * 100]}
-                  onValueChange={(value) => setPercentage(value[0] / 100)}
-                  min={0.05}
-                  max={1}
-                  step={0.001}
-                  className="w-full"
-                />
+            <CardContent className="space-y-8 px-10 pb-10">
+              <div className="space-y-8">
+                <div className="relative">
+                  <Slider
+                    value={[percentage * 100]}
+                    onValueChange={(value) => setPercentage(value[0] / 100)}
+                    min={0.05}
+                    max={1}
+                    step={0.001}
+                    className="w-full h-3"
+                  />
+                  <div className="flex justify-between text-sm text-gray-400 mt-3">
+                    <span>0.05%</span>
+                    <span>1.0%</span>
+                  </div>
+                </div>
 
-                <div className="text-center space-y-2">
-                  <div className="text-3xl font-bold text-[#86efac]">
+                <div className="text-center space-y-6">
+                  <div className="text-5xl font-black text-[#86efac] tracking-tight">
                     {(percentage * 100).toFixed(3)}%
                   </div>
 
-                  {/* <div className="flex items-center justify-center gap-4 text-sm">
-                    <Badge
-                      variant="outline"
-                      className="border-[#86efac]/30 text-[#86efac]"
-                    >
-                      {(percentage * 100).toFixed(2)}% fees = $
-                      {(10000 * percentage).toFixed(2)}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className="border-gray-600 text-gray-400"
-                    >
-                      Your Share: ${(10000 * percentage * 0.7).toFixed(2)}
-                    </Badge>
-                  </div> */}
-
-                  <div className="flex flex-col md:flex-row">
-                    <p className="text-gray-400 w-fit flex-row">
+                  <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+                    <p className="text-gray-300 text-lg font-medium">
                       {isNewUser
                         ? "Set your earnings rate to kickstart referrals!"
                         : `If your referral trades $10,000, you'll earn $${(
@@ -907,115 +987,125 @@ const ReferralDashboard: React.FC = () => {
                           ).toFixed(2)}`}
                     </p>
 
-                    <span
-                      className="w-fit content-center mt-3 ml-15 md:mt-0 md:ml-3 flex items-center gap-1 cursor-pointer text-sm text-green-400 border-b"
-                      // style={{ textDecoration: "underline" }}
+                    <motion.span
+                      className="flex items-center gap-2 cursor-pointer text-[#86efac] border-b border-[#86efac]/50 hover:border-[#86efac] transition-colors font-medium"
                       onClick={() => setIsOpen(!isOpen)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                     >
                       View breakdown
                       <ChevronDown
-                        className={`h-5 w-5 transition-transform duration-200 ${
+                        className={`h-5 w-5 transition-transform duration-300 ${
                           isOpen ? "rotate-180" : ""
                         }`}
-                        style={{ display: "inline" }}
                       />
-                    </span>
+                    </motion.span>
                   </div>
                 </div>
 
                 {isOpen && (
-                  <div className="mt-4 p-4 mx-auto rounded-md">
-                    <div className="flex items-center justify-center gap-4 text-sm">
-                      {/* <Badge
-                      variant="outline"
-                      className="border-[#86efac]/30 text-[#86efac]"
-                    >
-                      Gross: ${(10000 * percentage).toFixed(2)}
-                    </Badge> */}
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-gradient-to-r from-gray-800/50 to-gray-700/30 backdrop-blur-xl rounded-2xl p-6 border border-gray-600/30"
+                  >
+                    <div className="flex items-center justify-center gap-6 text-sm">
                       <Badge
                         variant="outline"
-                        className="border-[#86efac]/30 text-[#86efac]"
+                        className="border-[#86efac]/40 bg-[#86efac]/10 text-[#86efac] px-4 py-2 rounded-xl font-semibold"
                       >
                         {(percentage * 100).toFixed(2)}% fees = $
                         {(10000 * percentage).toFixed(2)}
                       </Badge>
                       <Badge
                         variant="outline"
-                        className="border-gray-600 text-gray-400"
+                        className="border-gray-500/40 bg-gray-600/10 text-gray-300 px-4 py-2 rounded-xl font-semibold"
                       >
                         Your Share: ${(10000 * percentage * 0.7).toFixed(2)}
-                        {/* Net (70%): ${(10000 * percentage * 0.7).toFixed(2)} */}
                       </Badge>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
               </div>
 
               <Button
                 onClick={savePercentage}
                 disabled={!referralCode}
-                className="w-full bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium"
+                className="w-full bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90 font-bold py-4 rounded-2xl shadow-2xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                <Save className="w-4 h-4 mr-2" />
+                <Save className="w-5 h-5 mr-2" />
                 Save Percentage
               </Button>
             </CardContent>
           </Card>
         </motion.section>
 
-        {/* Stats Section */}
+        {/* Enhanced Stats Section */}
         <motion.section
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="space-y-8"
+          transition={{ duration: 0.8 }}
+          className="space-y-12"
         >
-          <h2 className="text-3xl font-bold text-center">
+          <h2 className="text-4xl md:text-5xl font-black text-center bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
             Your Referral Stats
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {[
               {
                 label: "Total Referrals",
                 value: isNewUser ? "0" : stats.referrals.toString(),
                 icon: Users,
                 color: "text-blue-400",
-                bgColor: "bg-blue-400/10",
+                bgColor: "from-blue-500/20 to-blue-600/10",
+                borderColor: "border-blue-400/30",
               },
               {
                 label: "Total Earnings",
                 value: isNewUser ? "$0" : `$${stats.earnings}`,
                 icon: DollarSign,
                 color: "text-[#86efac]",
-                bgColor: "bg-[#86efac]/10",
+                bgColor: "from-[#86efac]/20 to-[#22c55e]/10",
+                borderColor: "border-[#86efac]/30",
               },
-              // {
-              //   label: "Pending Earnings",
-              //   value: isNewUser ? "$0" : `$${stats.pending}`,
-              //   icon: Clock,
-              //   color: "text-yellow-400",
-              //   bgColor: "bg-yellow-400/10",
-              // },
+              {
+                label: "Referral Points",
+                value: isNewUser
+                  ? "0"
+                  : `${stats.referralPointsTotal.toLocaleString()}`,
+                icon: Sparkles,
+                color: "text-purple-400",
+                bgColor: "from-purple-500/20 to-purple-600/10",
+                borderColor: "border-purple-400/30",
+              },
             ].map((stat, i) => (
               <motion.div
                 key={i}
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={{ scale: 0.8, opacity: 0 }}
                 whileInView={{ scale: 1, opacity: 1 }}
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
+                whileHover={{ scale: 1.05, y: -5 }}
+                transition={{ duration: 0.6, delay: i * 0.2 }}
               >
-                <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800 hover:border-gray-700 transition-colors">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-xl ${stat.bgColor}`}>
-                        <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                <Card
+                  className={`bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-2xl border ${stat.borderColor} rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-500 overflow-hidden`}
+                >
+                  <CardContent className="p-8">
+                    <div className="flex items-center gap-6">
+                      <div
+                        className={`p-4 rounded-2xl bg-gradient-to-br ${stat.bgColor} shadow-xl`}
+                      >
+                        <stat.icon className={`w-8 h-8 ${stat.color}`} />
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-400 font-medium">
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-400 font-semibold uppercase tracking-wider">
                           {stat.label}
                         </p>
-                        <p className="text-2xl font-bold">{stat.value}</p>
+                        <p className="text-3xl font-black text-white">
+                          {stat.value}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -1024,16 +1114,66 @@ const ReferralDashboard: React.FC = () => {
             ))}
           </div>
 
-          {/* Chart */}
-          <div className="max-w-4xl mx-auto hidden">
+          {/* Points Breakdown */}
+          {!isNewUser && stats.points > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="max-w-4xl mx-auto hidden"
+            >
+              <Card className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 backdrop-blur-2xl border border-purple-400/30 rounded-3xl shadow-2xl overflow-hidden">
+                <CardContent className="p-8">
+                  <div className="text-center space-y-6">
+                    <div className="flex items-center justify-center gap-3">
+                      <Sparkles className="w-8 h-8 text-purple-400" />
+                      <h3 className="text-2xl font-bold text-purple-400">
+                        Points Breakdown
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="text-center space-y-2">
+                        <p className="text-gray-400 font-medium">Base Points</p>
+                        <p className="text-2xl font-bold text-white">1,000</p>
+                      </div>
+                      <div className="text-center space-y-2">
+                        <p className="text-gray-400 font-medium">
+                          Referral Bonus
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          +{stats.referrals * 50}
+                        </p>
+                      </div>
+                      <div className="text-center space-y-2">
+                        <p className="text-gray-400 font-medium">
+                          Activity Bonus
+                        </p>
+                        <p className="text-2xl font-bold text-white">+250</p>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-purple-500/10 to-purple-600/5 rounded-2xl p-4 mt-6">
+                      <p className="text-gray-300 text-sm">
+                        Earn points by referring friends, completing milestones,
+                        and staying active. Points unlock exclusive rewards and
+                        higher referral tiers!
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Enhanced Chart Section */}
+          <div className="max-w-5xl mx-auto hidden">
             {isNewUser || history.length === 0 ? (
-              <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
-                <CardContent className="p-12 text-center">
-                  <TrendingUp className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-400 mb-2">
+              <Card className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-2xl border border-gray-700/50 rounded-3xl shadow-2xl">
+                <CardContent className="p-16 text-center">
+                  <TrendingUp className="w-20 h-20 text-gray-600 mx-auto mb-6" />
+                  <h3 className="text-2xl font-bold text-gray-300 mb-4">
                     No Earnings Yet
                   </h3>
-                  <p className="text-gray-500 mb-6">
+                  <p className="text-gray-400 mb-8 text-lg">
                     Share your referral code to see your earnings growth!
                   </p>
                   {!referralCode && (
@@ -1042,20 +1182,27 @@ const ReferralDashboard: React.FC = () => {
                         if (!connected || !walletAddress) {
                           toast.custom((t) => (
                             <div
-                              className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+                              className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
                                 t.visible ? "animate-enter" : "animate-leave"
                               }`}
-                              style={{ background: "#86efac", color: "#000" }}
+                              style={{
+                                background:
+                                  "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+                                color: "#000",
+                                border: "1px solid rgba(134, 239, 172, 0.3)",
+                              }}
                             >
-                              <Wallet size={20} color="#000" />
-                              <span>Connect your wallet to start earning!</span>
+                              <Wallet size={22} color="#000" />
+                              <span className="font-medium">
+                                Connect your wallet to start earning!
+                              </span>
                             </div>
                           ));
                           return;
                         }
                         setShowModal(true);
                       }}
-                      className="bg-[#86efac] text-black hover:bg-[#86efac]/90"
+                      className="bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90 font-bold px-8 py-4 rounded-2xl shadow-2xl transition-all duration-300 hover:scale-105"
                     >
                       Generate Code Now
                     </Button>
@@ -1063,13 +1210,13 @@ const ReferralDashboard: React.FC = () => {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
-                <CardHeader>
-                  <CardTitle className="text-xl text-center">
+              <Card className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-2xl border border-gray-700/50 rounded-3xl shadow-2xl">
+                <CardHeader className="pb-6">
+                  <CardTitle className="text-2xl text-center font-bold text-white">
                     Earnings Over Time
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-8">
                   <canvas id="earningsChart" height="200" className="w-full" />
                 </CardContent>
               </Card>
@@ -1077,47 +1224,50 @@ const ReferralDashboard: React.FC = () => {
           </div>
         </motion.section>
 
-        {/* Leaderboard */}
+        {/* Enhanced Leaderboard */}
         <motion.section
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="max-w-2xl mx-auto"
+          transition={{ duration: 0.8 }}
+          className="max-w-3xl mx-auto"
         >
-          <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-2xl text-center text-[#86efac] flex items-center justify-center gap-2">
-                <Award className="w-6 h-6" />
+          <Card className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-2xl border border-gray-700/50 rounded-3xl shadow-2xl overflow-hidden">
+            <CardHeader className="pb-8">
+              <CardTitle className="text-3xl text-center text-[#86efac] flex items-center justify-center gap-3 font-bold">
+                <Award className="w-8 h-8" />
                 Top Referrers
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-10 pb-10">
               {isNewUser || leaderboardData.length === 0 ? (
-                <div className="text-center py-8">
-                  <Award className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-400 mb-2">
+                <div className="text-center py-12">
+                  <Award className="w-16 h-16 text-gray-600 mx-auto mb-6" />
+                  <h3 className="text-xl font-bold text-gray-300 mb-4">
                     Be the First Top Referrer!
                   </h3>
-                  <p className="text-gray-500">
+                  <p className="text-gray-400 text-lg">
                     Invite friends to climb the leaderboard.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {leaderboardData.map((entry, i) => (
                     <motion.div
                       key={i}
-                      initial={{ x: 50, opacity: 0 }}
+                      initial={{ x: 60, opacity: 0 }}
                       whileInView={{ x: 0, opacity: 1 }}
-                      transition={{ duration: 0.5, delay: i * 0.1 }}
-                      className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg border-l-4 border-[#86efac]"
+                      whileHover={{ scale: 1.02, x: 10 }}
+                      transition={{ duration: 0.6, delay: i * 0.1 }}
+                      className="flex items-center gap-6 p-6 bg-gradient-to-r from-gray-800/60 to-gray-700/40 backdrop-blur-xl rounded-2xl border-l-4 border-[#86efac] shadow-xl"
                     >
-                      <div className="w-8 h-8 bg-[#86efac]/20 rounded-full flex items-center justify-center text-[#86efac] font-bold">
+                      <div className="w-12 h-12 bg-gradient-to-br from-[#86efac]/30 to-[#22c55e]/20 backdrop-blur-xl rounded-full flex items-center justify-center text-[#86efac] font-black text-lg shadow-xl">
                         {i + 1}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium">{entry.name}</p>
-                        <p className="text-sm text-gray-400">
+                        <p className="font-bold text-white text-lg">
+                          {entry.name}
+                        </p>
+                        <p className="text-gray-300 font-medium">
                           {entry.referrals} referrals
                         </p>
                       </div>
@@ -1129,20 +1279,20 @@ const ReferralDashboard: React.FC = () => {
           </Card>
         </motion.section>
 
-        {/* Referral History */}
+        {/* Enhanced Referral History */}
         <motion.section
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="max-w-4xl mx-auto"
+          transition={{ duration: 0.8 }}
+          className="max-w-5xl mx-auto"
         >
-          <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <CardTitle className="text-2xl text-[#86efac]">
+          <Card className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-2xl border border-gray-700/50 rounded-3xl shadow-2xl overflow-hidden">
+            <CardHeader className="pb-8">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                <CardTitle className="text-3xl text-[#86efac] font-bold">
                   Referral History
                 </CardTitle>
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   {["Date", "Earnings"].map((filter) => (
                     <Button
                       key={filter}
@@ -1151,33 +1301,40 @@ const ReferralDashboard: React.FC = () => {
                       onClick={() =>
                         toast.custom((t) => (
                           <div
-                            className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+                            className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
                               t.visible ? "animate-enter" : "animate-leave"
                             }`}
-                            style={{ background: "#86efac", color: "#000" }}
+                            style={{
+                              background:
+                                "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+                              color: "#000",
+                              border: "1px solid rgba(134, 239, 172, 0.3)",
+                            }}
                           >
-                            <ListFilter size={20} color="#000" />
-                            <span>Sorting by {filter} coming soon!</span>
+                            <ListFilter size={22} color="#000" />
+                            <span className="font-medium">
+                              Sorting by {filter} coming soon!
+                            </span>
                           </div>
                         ))
                       }
-                      className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50"
+                      className="border-gray-600/50 bg-gray-800/40 backdrop-blur-xl text-gray-200 hover:bg-[#86efac]/10 hover:border-[#86efac]/50 hover:text-[#86efac] rounded-2xl px-4 py-2 font-medium transition-all duration-300"
                     >
-                      <ListFilter className="w-4 h-4 mr-1" />
+                      <ListFilter className="w-4 h-4 mr-2" />
                       {filter}
                     </Button>
                   ))}
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-10 pb-10">
               {historyData.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-400 mb-2">
+                <div className="text-center py-16">
+                  <Users className="w-20 h-20 text-gray-600 mx-auto mb-6" />
+                  <h3 className="text-2xl font-bold text-gray-300 mb-4">
                     No Referrals Yet
                   </h3>
-                  <p className="text-gray-500 mb-6">
+                  <p className="text-gray-400 mb-8 text-lg">
                     Invite friends to start building your referral history!
                   </p>
                   {!referralCode && (
@@ -1186,13 +1343,18 @@ const ReferralDashboard: React.FC = () => {
                         if (!connected || !walletAddress) {
                           toast.custom((t) => (
                             <div
-                              className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+                              className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border ${
                                 t.visible ? "animate-enter" : "animate-leave"
                               }`}
-                              style={{ background: "#86efac", color: "#000" }}
+                              style={{
+                                background:
+                                  "linear-gradient(135deg, #86efac 0%, #22c55e 100%)",
+                                color: "#000",
+                                border: "1px solid rgba(134, 239, 172, 0.3)",
+                              }}
                             >
-                              <Wallet size={20} color="#000" />
-                              <span>
+                              <Wallet size={22} color="#000" />
+                              <span className="font-medium">
                                 Connect your wallet to unlock the power of
                                 referrals!
                               </span>
@@ -1202,52 +1364,36 @@ const ReferralDashboard: React.FC = () => {
                         }
                         setShowModal(true);
                       }}
-                      className="bg-[#86efac] text-black hover:bg-[#86efac]/90"
+                      className="bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90 font-bold px-8 py-4 rounded-2xl shadow-2xl transition-all duration-300 hover:scale-105"
                     >
                       Generate Link
                     </Button>
                   )}
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {historyData.map((entry) => (
+                <div className="space-y-4">
+                  {historyData.map((entry, i) => (
                     <motion.div
-                      key={entry.id}
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      transition={{ duration: 0.5 }}
-                      className={`p-4 rounded-lg border-l-4 ${
-                        entry.status === "ACTIVE"
-                          ? "bg-[#86efac]/5 border-[#86efac]"
-                          : "bg-gray-800/30 border-gray-600"
-                      }`}
+                      key={i}
+                      initial={{ x: 60, opacity: 0 }}
+                      whileInView={{ x: 0, opacity: 1 }}
+                      whileHover={{ scale: 1.02, x: 10 }}
+                      transition={{ duration: 0.6, delay: i * 0.1 }}
+                      className="flex items-center gap-6 p-6 bg-gradient-to-r from-gray-800/60 to-gray-700/40 backdrop-blur-xl rounded-2xl border-l-4 border-[#86efac] shadow-xl"
                     >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium">{entry.name}</p>
-                          <p className="text-sm text-gray-400">
-                            Joined {new Date(entry.date).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-[#86efac]">
-                            ${entry.earnings}
-                          </p>
-                          <Badge
-                            variant={
-                              entry.status === "ACTIVE"
-                                ? "default"
-                                : "secondary"
-                            }
-                            className={
-                              entry.status === "ACTIVE"
-                                ? "bg-[#86efac]/20 text-[#86efac]"
-                                : ""
-                            }
-                          >
-                            {entry.status}
-                          </Badge>
-                        </div>
+                      <div className="w-12 h-12 bg-gradient-to-br from-[#86efac]/30 to-[#22c55e]/20 backdrop-blur-xl rounded-full flex items-center justify-center text-[#86efac] font-black text-lg shadow-xl">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-white text-lg">
+                          {entry.name}
+                        </p>
+                        <p className="text-gray-300 font-medium">
+                          {entry.date}
+                        </p>
+                        <p className="text-gray-300 font-medium">
+                          ${entry.earnings}
+                        </p>
                       </div>
                     </motion.div>
                   ))}
@@ -1256,207 +1402,7 @@ const ReferralDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </motion.section>
-
-        {/* Rewards Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="max-w-2xl mx-auto"
-        >
-          <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-2xl text-center text-[#86efac] flex items-center justify-center gap-2">
-                <Award className="w-6 h-6" />
-                Rewards & Milestones
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center space-y-4">
-                <p className="text-gray-400">
-                  {isNewUser
-                    ? "Make your first referral to unlock rewards!"
-                    : `${stats.referrals}/5 Referrals for Bronze Badge`}
-                </p>
-
-                <div className="w-full bg-gray-800 rounded-full h-3">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{
-                      width: `${Math.min((stats.referrals / 5) * 100, 100)}%`,
-                    }}
-                    transition={{ duration: 1, delay: 0.5 }}
-                    className="bg-gradient-to-r from-[#86efac] to-[#22c55e] h-3 rounded-full"
-                  />
-                </div>
-
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>0</span>
-                  <span>5 referrals</span>
-                </div>
-              </div>
-
-              <Button
-                onClick={claimNFT}
-                disabled={stats.referrals < 5}
-                className={`w-full font-medium ${
-                  stats.referrals >= 5
-                    ? "bg-gradient-to-r from-[#86efac] to-[#22c55e] text-black hover:from-[#86efac]/90 hover:to-[#22c55e]/90"
-                    : "bg-gray-800 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                <Award className="w-4 h-4 mr-2" />
-                {stats.referrals >= 5
-                  ? "Claim Bronze NFT"
-                  : "Bronze NFT Locked"}
-              </Button>
-            </CardContent>
-          </Card>
-        </motion.section>
       </div>
-
-      {/* Modal */}
-      {showModal && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="w-full max-w-md"
-          >
-            <Card className="bg-gray-900 border-gray-800 relative">
-              <Button
-                onClick={closeModal}
-                variant="ghost"
-                size="sm"
-                className="absolute top-4 right-4 text-gray-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-
-              {modalStep === 1 && (
-                <motion.div
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <CardHeader className="text-center space-y-4">
-                    <div className="w-16 h-16 bg-[#86efac]/20 rounded-full flex items-center justify-center mx-auto">
-                      <Sparkles className="w-8 h-8 text-[#86efac]" />
-                    </div>
-                    <CardTitle className="text-2xl">
-                      Start Earning with Referrals!
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <p className="text-gray-400 text-center">
-                      Invite friends and earn a percentage of their transactions
-                      on Deserialize.
-                    </p>
-                    <Button
-                      onClick={() => setModalStep(2)}
-                      className="w-full bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium"
-                    >
-                      Continue
-                    </Button>
-                  </CardContent>
-                </motion.div>
-              )}
-
-              {modalStep === 2 && (
-                <motion.div
-                  initial={{ x: 20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">
-                      Customize Your Code
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <Input
-                        value={customCode}
-                        onChange={(e) => setCustomCode(e.target.value)}
-                        placeholder="Enter custom referral code (optional)"
-                        className="bg-gray-800 border-gray-700 text-white focus:border-[#86efac] focus:ring-[#86efac]/20"
-                      />
-                      <p className="text-sm text-gray-400">
-                        {customCode
-                          ? "Custom code available!"
-                          : "Leave empty for auto-generated code, or enter 3-10 alphanumeric characters"}
-                      </p>
-                    </div>
-                    <Button
-                      onClick={generateReferralCode}
-                      className="w-full bg-[#86efac] text-black hover:bg-[#86efac]/90 font-medium"
-                    >
-                      Generate Referral Code
-                    </Button>
-                  </CardContent>
-                </motion.div>
-              )}
-            </Card>
-          </motion.div>
-        </motion.div>
-      )}
-
-      {/* FAQ Button */}
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        whileHover={{ scale: 1.1 }}
-        className="fixed bottom-6 right-6 z-40"
-      >
-        <Button
-          onClick={() => setShowFAQ(!showFAQ)}
-          className="bg-[#86efac] text-black hover:bg-[#86efac]/90 rounded-full w-14 h-14 shadow-lg shadow-[#86efac]/25"
-        >
-          <HelpCircle className="w-6 h-6" />
-        </Button>
-      </motion.div>
-
-      {/* FAQ Panel */}
-      {showFAQ && (
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 20, scale: 0.95 }}
-          className="fixed bottom-24 right-6 w-80 max-w-[calc(100vw-3rem)] z-40"
-        >
-          <Card className="bg-gray-900 border-gray-800 shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-lg text-[#86efac]">
-                Frequently Asked Questions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Accordion type="single" collapsible>
-                {faqsData.map((faq, i) => (
-                  <AccordionItem
-                    key={i}
-                    value={`item-${i}`}
-                    className="border-gray-800"
-                  >
-                    <AccordionTrigger className="text-[#86efac] hover:text-[#86efac]/80">
-                      {faq.question}
-                    </AccordionTrigger>
-                    <AccordionContent className="text-gray-400">
-                      {faq.answer}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
     </div>
   );
 };
@@ -1499,6 +1445,10 @@ export default ReferralDashboard;
 //   Sparkles,
 //   LinkIcon,
 //   QrCode,
+//   Wallet,
+//   AlertCircle,
+//   CopyCheck,
+//   ChevronDown,
 // } from "lucide-react";
 
 // interface Referral {
@@ -1579,11 +1529,12 @@ export default ReferralDashboard;
 //   const [faqs, setFaqs] = useState<FAQ[]>([]);
 //   const [isLoading, setIsLoading] = useState(true);
 //   const canvasRef = useRef<HTMLCanvasElement>(null);
+//   const [isOpen, setIsOpen] = useState(false);
 
 //   const { walletAddress, connecting, connected } = useAppContext();
 
 //   // Demo data
-//   const demoStats = { referrals: 0, earnings: 0, pending: 0 };
+//   const demoStats = { referrals: 5, earnings: 50, pending: 10 };
 //   const demoFAQs: FAQ[] = [
 //     {
 //       question: "How do referrals work?",
@@ -1640,12 +1591,16 @@ export default ReferralDashboard;
 //         let historyData: Referral[] = [];
 //         if (historyResponse.ok) {
 //           historyData = await historyResponse.json();
+//         } else {
+//           console.warn("No referral history data available");
 //         }
 
 //         const leaderboardResponse = await fetch("/api/referrals/leaderboard");
 //         let leaderboardData: LeaderboardEntry[] = [];
 //         if (leaderboardResponse.ok) {
 //           leaderboardData = await leaderboardResponse.json();
+//         } else {
+//           console.warn("No leaderboard data available");
 //         }
 
 //         const combinedData = {
@@ -1663,7 +1618,17 @@ export default ReferralDashboard;
 //         setLeaderboard(leaderboardData);
 //       } catch (error: any) {
 //         console.error("Failed to fetch data:", error);
-//         toast.error(error.message || "Failed to fetch data.");
+//         toast.custom((t) => (
+//           <div
+//             className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//               t.visible ? "animate-enter" : "animate-leave"
+//             }`}
+//             style={{ background: "#86efac", color: "#000" }}
+//           >
+//             <AlertCircle size={20} color="#000" />
+//             <span>{error.message || "Failed to fetch data."}</span>
+//           </div>
+//         ));
 //         setUserReferralData({
 //           referralCode: null,
 //           defaultReferralPercentage: 0.001,
@@ -1684,9 +1649,15 @@ export default ReferralDashboard;
 //   // Enhanced particle background
 //   useEffect(() => {
 //     const canvas = canvasRef.current;
-//     if (!canvas) return;
+//     if (!canvas) {
+//       console.error("Canvas not found");
+//       return;
+//     }
 //     const ctx = canvas.getContext("2d");
-//     if (!ctx) return;
+//     if (!ctx) {
+//       console.error("Canvas context not available");
+//       return;
+//     }
 
 //     canvas.width = window.innerWidth;
 //     canvas.height = window.innerHeight;
@@ -1707,19 +1678,19 @@ export default ReferralDashboard;
 //       pulseScale: number;
 //     }
 
-//     const particles: Particle[] = Array.from({ length: 80 }, () => {
+//     const particles: Particle[] = Array.from({ length: 120 }, () => {
 //       const isCircle = Math.random() < 0.7;
 //       return {
 //         x: Math.random() * canvas.width,
 //         y: Math.random() * canvas.height,
-//         radius: isCircle ? Math.random() * 1.5 + 0.5 : undefined,
-//         length: !isCircle ? Math.random() * 2 + 1 : undefined,
+//         radius: isCircle ? Math.random() * 2 + 1 : undefined,
+//         length: !isCircle ? Math.random() * 3 + 2 : undefined,
 //         rotation: !isCircle ? Math.random() * Math.PI * 2 : undefined,
-//         vx: Math.random() * 0.3 - 0.15,
-//         vy: Math.random() * 0.3 - 0.15,
-//         opacity: Math.random() * 0.4 + 0.2,
+//         vx: Math.random() * 0.5 - 0.25,
+//         vy: Math.random() * 0.5 - 0.25,
+//         opacity: Math.random() * 0.6 + 0.3,
 //         type: isCircle ? "circle" : "line",
-//         wave: Math.random() < 0.3 && isCircle,
+//         wave: Math.random() < 0.2 && isCircle,
 //         waveOffset: Math.random() * Math.PI * 2,
 //         pulse: Math.random() < 0.1 && isCircle,
 //         pulseScale: 1,
@@ -1737,7 +1708,7 @@ export default ReferralDashboard;
 //     const animate = (time: number) => {
 //       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-//       // Connection lines
+//       // Draw connection lines
 //       for (let i = 0; i < particles.length; i++) {
 //         for (let j = i + 1; j < particles.length; j++) {
 //           const p1 = particles[i],
@@ -1745,46 +1716,50 @@ export default ReferralDashboard;
 //           const dx = p1.x - p2.x,
 //             dy = p1.y - p2.y;
 //           const dist = Math.sqrt(dx * dx + dy * dy);
-//           if (dist < 120) {
+//           if (dist < 100) {
 //             ctx.beginPath();
 //             ctx.moveTo(p1.x, p1.y);
 //             ctx.lineTo(p2.x, p2.y);
-//             ctx.strokeStyle = `rgba(134, 239, 172, ${0.3 * (1 - dist / 120)})`;
+//             ctx.strokeStyle = `rgba(134, 239, 172, ${0.4 * (1 - dist / 100)})`;
 //             ctx.lineWidth = 0.5;
 //             ctx.stroke();
 //           }
 //         }
 //       }
 
+//       // Update and draw particles
 //       particles.forEach((p) => {
+//         // Mouse interaction
 //         const dx = mouseX - p.x,
 //           dy = mouseY - p.y;
 //         const dist = Math.sqrt(dx * dx + dy * dy);
 //         let currentOpacity = p.opacity;
-
-//         if (dist < 100) {
-//           p.vx += (dx / dist) * 0.01;
-//           p.vy += (dy / dist) * 0.01;
+//         if (dist < 150) {
+//           p.vx += (dx / dist) * 0.02;
+//           p.vy += (dy / dist) * 0.02;
 //           currentOpacity = Math.min(
-//             0.8,
-//             p.opacity + ((100 - dist) / 100) * 0.3
+//             0.9,
+//             p.opacity + ((150 - dist) / 150) * 0.4
 //           );
 //         }
 
+//         // Update position
 //         p.x += p.vx;
 //         p.y += p.vy;
-
 //         if (p.wave) {
-//           p.y += Math.sin(time / 1000 + p.waveOffset) * 0.3;
+//           p.y += Math.sin(time / 1000 + p.waveOffset) * 0.5;
 //         }
-
 //         if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
 //         if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+//         p.vx = Math.max(-0.5, Math.min(0.5, p.vx));
+//         p.vy = Math.max(-0.5, Math.min(0.5, p.vy));
 
+//         // Pulse effect
 //         if (p.pulse) {
-//           p.pulseScale = 0.8 + Math.sin(time / 400) * 0.2;
+//           p.pulseScale = 0.8 + Math.sin(time / 500) * 0.2;
 //         }
 
+//         // Draw particle
 //         ctx.beginPath();
 //         if (p.type === "circle") {
 //           ctx.arc(
@@ -1794,14 +1769,14 @@ export default ReferralDashboard;
 //             0,
 //             Math.PI * 2
 //           );
-//           ctx.fillStyle = `rgba(134, 239, 172, ${currentOpacity * 1.2})`;
+//           ctx.fillStyle = `rgba(134, 239, 172, ${currentOpacity})`;
 //           ctx.fill();
 //         } else {
 //           const x2 = p.x + Math.cos(p.rotation!) * p.length!;
 //           const y2 = p.y + Math.sin(p.rotation!) * p.length!;
 //           ctx.moveTo(p.x, p.y);
 //           ctx.lineTo(x2, y2);
-//           ctx.strokeStyle = `rgba(134, 239, 172, ${currentOpacity * 1.2})`;
+//           ctx.strokeStyle = `rgba(134, 239, 172, ${currentOpacity})`;
 //           ctx.lineWidth = 1;
 //           ctx.stroke();
 //         }
@@ -1820,6 +1795,7 @@ export default ReferralDashboard;
 //     const ctx = document.getElementById("earningsChart") as HTMLCanvasElement;
 //     if (!ctx) return;
 
+//     // Aggregate earnings by month
 //     const earningsByMonth: { [key: string]: number } = {};
 //     history.forEach((entry) => {
 //       const date = new Date(entry.date);
@@ -1831,6 +1807,7 @@ export default ReferralDashboard;
 //         (earningsByMonth[monthYear] || 0) + entry.earnings;
 //     });
 
+//     // Sort months chronologically
 //     const labels = Object.keys(earningsByMonth).sort((a, b) => {
 //       const dateA = new Date(`1 ${a}`);
 //       const dateB = new Date(`1 ${b}`);
@@ -1898,7 +1875,17 @@ export default ReferralDashboard;
 //   // Generate referral code
 //   const generateReferralCode = async () => {
 //     if (!connected || !walletAddress) {
-//       toast.error("Connect your wallet to unlock the power of referrals!");
+//       toast.custom((t) => (
+//         <div
+//           className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//             t.visible ? "animate-enter" : "animate-leave"
+//           }`}
+//           style={{ background: "#86efac", color: "#000" }}
+//         >
+//           <Wallet size={20} color="#000" />
+//           <span>Connect your wallet to unlock the power of referrals!</span>
+//         </div>
+//       ));
 //       return;
 //     }
 
@@ -1906,32 +1893,50 @@ export default ReferralDashboard;
 //     try {
 //       const response = await fetch("/api/referral-code", {
 //         method: "POST",
-//         headers: { "Content-Type": "application/json" },
+//         headers: {
+//           "Content-Type": "application/json",
+//         },
 //         body: JSON.stringify({ walletAddress, customCode }),
 //       });
-
 //       if (!response.ok) {
 //         const errorData = await response.json();
 //         throw new Error(errorData.error || "Failed to generate referral code");
 //       }
-
 //       const { referralCode: newCode } = await response.json();
 //       setReferralCode(newCode);
 //       setShowModal(false);
 //       setModalStep(1);
 //       setCustomCode("");
-
 //       confetti({
 //         particleCount: 150,
 //         spread: 70,
 //         origin: { y: 0.6 },
 //         colors: ["#86efac"],
 //       });
-
-//       toast.success("Referral code generated!");
+//       toast.custom((t) => (
+//         <div
+//           className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//             t.visible ? "animate-enter" : "animate-leave"
+//           }`}
+//           style={{ background: "#86efac", color: "#000" }}
+//         >
+//           <Save size={20} color="#000" />
+//           <span>Referral code generated!</span>
+//         </div>
+//       ));
 //     } catch (error: any) {
 //       console.error("Failed to generate referral code:", error);
-//       toast.error(error.message || "Failed to generate referral code.");
+//       toast.custom((t) => (
+//         <div
+//           className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//             t.visible ? "animate-enter" : "animate-leave"
+//           }`}
+//           style={{ background: "#FFA500", color: "#000" }}
+//         >
+//           <AlertCircle size={20} color="#000" />
+//           <span>{error.message || "Failed to generate referral code."}</span>
+//         </div>
+//       ));
 //     } finally {
 //       setIsLoading(false);
 //     }
@@ -1940,7 +1945,17 @@ export default ReferralDashboard;
 //   // Save percentage
 //   const savePercentage = async () => {
 //     if (!connected || !walletAddress) {
-//       toast.error("Connect your wallet to unlock the power of referrals!");
+//       toast.custom((t) => (
+//         <div
+//           className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//             t.visible ? "animate-enter" : "animate-leave"
+//           }`}
+//           style={{ background: "#86efac", color: "#000" }}
+//         >
+//           <Wallet size={20} color="#000" />
+//           <span>Connect your wallet to unlock the power of referrals!</span>
+//         </div>
+//       ));
 //       return;
 //     }
 
@@ -1948,23 +1963,46 @@ export default ReferralDashboard;
 //     try {
 //       const response = await fetch("/api/user/percentage", {
 //         method: "PATCH",
-//         headers: { "Content-Type": "application/json" },
+//         headers: {
+//           "Content-Type": "application/json",
+//         },
 //         body: JSON.stringify({ walletAddress, percentage }),
 //       });
-
 //       if (!response.ok) {
 //         const errorData = await response.json();
 //         throw new Error(errorData.error || "Failed to save percentage");
 //       }
-
 //       const { defaultReferralPercentage } = await response.json();
 //       setPercentage(defaultReferralPercentage);
-
-//       confetti({ particleCount: 50, spread: 50, colors: ["#86efac"] });
-//       toast.success("Percentage saved!");
+//       confetti({
+//         particleCount: 50,
+//         spread: 50,
+//         colors: ["#86efac"],
+//       });
+//       toast.custom((t) => (
+//         <div
+//           className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//             t.visible ? "animate-enter" : "animate-leave"
+//           }`}
+//           style={{ background: "#86efac", color: "#000" }}
+//         >
+//           <Save size={20} color="#000" />
+//           <span>Percentage saved!</span>
+//         </div>
+//       ));
 //     } catch (error: any) {
 //       console.error("Failed to save percentage:", error);
-//       toast.error(error.message || "Failed to save percentage.");
+//       toast.custom((t) => (
+//         <div
+//           className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//             t.visible ? "animate-enter" : "animate-leave"
+//           }`}
+//           style={{ background: "#86efac", color: "#000" }}
+//         >
+//           <AlertCircle size={20} color="#000" />
+//           <span>{error.message || "Failed to save percentage."}</span>
+//         </div>
+//       ));
 //     } finally {
 //       setIsLoading(false);
 //     }
@@ -1973,16 +2011,47 @@ export default ReferralDashboard;
 //   // Claim NFT
 //   const claimNFT = async () => {
 //     if (!connected || !walletAddress) {
-//       toast.error("Connect your wallet to unlock the power of referrals!");
+//       toast.custom((t) => (
+//         <div
+//           className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//             t.visible ? "animate-enter" : "animate-leave"
+//           }`}
+//           style={{ background: "#86efac", color: "#000" }}
+//         >
+//           <Wallet size={20} color="#000" />
+//           <span>Connect your wallet to unlock the power of referrals!</span>
+//         </div>
+//       ));
 //       return;
 //     }
-//     toast("NFT claim coming soon!", { icon: "🎉" });
+
+//     toast.custom((t) => (
+//       <div
+//         className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//           t.visible ? "animate-enter" : "animate-leave"
+//         }`}
+//         style={{ background: "#86efac", color: "#000" }}
+//       >
+//         <AlertCircle size={20} color="#000" />
+//         <span>NFT claim coming soon!</span>
+//       </div>
+//     ));
 //   };
 
 //   // Copy to clipboard
 //   const copyToClipboard = (text: string) => {
 //     navigator.clipboard.writeText(text);
-//     toast.success("Copied to clipboard!");
+//     toast.custom((t) => (
+//       <div
+//         className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//           t.visible ? "animate-enter" : "animate-leave"
+//         }`}
+//         style={{ background: "#86efac", color: "#000" }}
+//       >
+//         <CopyCheck size={20} color="#000" />
+//         <span>Copied!</span>
+//       </div>
+//     ));
 //   };
 
 //   // Close modal
@@ -2052,28 +2121,34 @@ export default ReferralDashboard;
 //           className="text-center space-y-8"
 //         >
 //           <div className="space-y-4">
-//             <motion.div
-//               initial={{ scale: 0.9 }}
-//               animate={{ scale: 1 }}
-//               transition={{ duration: 0.5, delay: 0.2 }}
-//               className="inline-flex items-center gap-2 px-4 py-2 bg-[#86efac]/10 border border-[#86efac]/20 rounded-full text-[#86efac] text-sm font-medium"
-//             >
-//               <Sparkles className="w-4 h-4" />
-//               Deserialize Referral Program
-//             </motion.div>
+//             <div className="hidden">
+//               <motion.div
+//                 initial={{ scale: 0.9 }}
+//                 animate={{ scale: 1 }}
+//                 transition={{ duration: 0.5, delay: 0.2 }}
+//                 className="inline-flex items-center gap-2 px-4 py-2 bg-[#86efac]/10 border border-[#86efac]/20 rounded-full text-[#86efac] text-sm font-medium"
+//               >
+//                 <Sparkles className="w-4 h-4" />
+//                 Deserialize Referral Program
+//               </motion.div>
+//             </div>
 
-//             <h1 className="text-2xl md:text-7xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+//             <h1 className="text-2xl md:text-7xl font-bold bg-gradient-to-r  from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
 //               Earn on{" "}
 //               <span className="bg-gradient-to-r from-[#86efac] to-[#22c55e] bg-clip-text text-transparent">
 //                 Deserialize
 //               </span>
 //             </h1>
+//             <p className="text-base text-xl">
+//               You decide the fees we charge your referrals- we’ll pay you 70% of
+//               it!!
+//             </p>
 
 //             <motion.p
 //               initial={{ opacity: 0 }}
 //               animate={{ opacity: 1 }}
 //               transition={{ delay: 0.5 }}
-//               className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed"
+//               className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed hidden"
 //             >
 //               {isNewUser
 //                 ? "Start by generating your unique referral code to invite friends and earn rewards!"
@@ -2120,7 +2195,7 @@ export default ReferralDashboard;
 //                     </Button>
 //                   </div>
 
-//                   <div className="flex flex-wrap justify-center gap-3">
+//                   <div className="flex flex-wrap justify-center gap-3 hidden">
 //                     {["Twitter", "Telegram", "Discord"].map((platform) => (
 //                       <Button
 //                         key={platform}
@@ -2135,7 +2210,7 @@ export default ReferralDashboard;
 //                     ))}
 //                   </div>
 
-//                   <div className="flex flex-col items-center gap-4 pt-4">
+//                   <div className="flex flex-col items-center gap-4 pt-4 hidden">
 //                     <canvas id="qrCode" className="rounded-lg" />
 //                     <Button
 //                       onClick={() => toast.success("QR code downloaded!")}
@@ -2159,9 +2234,19 @@ export default ReferralDashboard;
 //               <Button
 //                 onClick={() => {
 //                   if (!connected || !walletAddress) {
-//                     toast.error(
-//                       "Connect your wallet to start earning from referrals!"
-//                     );
+//                     toast.custom((t) => (
+//                       <div
+//                         className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//                           t.visible ? "animate-enter" : "animate-leave"
+//                         }`}
+//                         style={{ background: "#86efac", color: "#000" }}
+//                       >
+//                         <Wallet size={20} color="#000" />
+//                         <span>
+//                           Connect your wallet to start earning from referrals!
+//                         </span>
+//                       </div>
+//                     ));
 //                     return;
 //                   }
 //                   setShowModal(true);
@@ -2185,9 +2270,9 @@ export default ReferralDashboard;
 //         >
 //           <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
 //             <CardHeader>
-//               <CardTitle className="text-2xl text-center text-[#86efac] flex items-center justify-center gap-2">
+//               <CardTitle className="text-xl text-center text-[#86efac] flex items-center justify-center gap-2">
 //                 <TrendingUp className="w-6 h-6" />
-//                 Choose fee for your referral
+//                 Set how much fee we charge your referrals
 //               </CardTitle>
 //             </CardHeader>
 //             <CardContent className="space-y-6">
@@ -2206,31 +2291,75 @@ export default ReferralDashboard;
 //                     {(percentage * 100).toFixed(3)}%
 //                   </div>
 
-//                   <div className="flex items-center justify-center gap-4 text-sm">
+//                   {/* <div className="flex items-center justify-center gap-4 text-sm">
 //                     <Badge
 //                       variant="outline"
 //                       className="border-[#86efac]/30 text-[#86efac]"
 //                     >
-//                       Gross: ${(10000 * percentage).toFixed(2)}
+//                       {(percentage * 100).toFixed(2)}% fees = $
+//                       {(10000 * percentage).toFixed(2)}
 //                     </Badge>
 //                     <Badge
 //                       variant="outline"
 //                       className="border-gray-600 text-gray-400"
 //                     >
-//                       Net (70%): ${(10000 * percentage * 0.7).toFixed(2)}
+//                       Your Share: ${(10000 * percentage * 0.7).toFixed(2)}
 //                     </Badge>
-//                   </div>
+//                   </div> */}
 
-//                   <p className="text-gray-400">
-//                     {isNewUser
-//                       ? "Set your earnings rate to kickstart referrals!"
-//                       : `If your referral trades $10,000, you'll earn $${(
-//                           10000 *
-//                           percentage *
-//                           0.7
-//                         ).toFixed(2)}`}
-//                   </p>
+//                   <div className="flex flex-col md:flex-row">
+//                     <p className="text-gray-400 w-fit flex-row">
+//                       {isNewUser
+//                         ? "Set your earnings rate to kickstart referrals!"
+//                         : `If your referral trades $10,000, you'll earn $${(
+//                             10000 *
+//                             percentage *
+//                             0.7
+//                           ).toFixed(2)}`}
+//                     </p>
+
+//                     <span
+//                       className="w-fit content-center mt-3 ml-15 md:mt-0 md:ml-3 flex items-center gap-1 cursor-pointer text-sm text-green-400 border-b"
+//                       // style={{ textDecoration: "underline" }}
+//                       onClick={() => setIsOpen(!isOpen)}
+//                     >
+//                       View breakdown
+//                       <ChevronDown
+//                         className={`h-5 w-5 transition-transform duration-200 ${
+//                           isOpen ? "rotate-180" : ""
+//                         }`}
+//                         style={{ display: "inline" }}
+//                       />
+//                     </span>
+//                   </div>
 //                 </div>
+
+//                 {isOpen && (
+//                   <div className="mt-4 p-4 mx-auto rounded-md">
+//                     <div className="flex items-center justify-center gap-4 text-sm">
+//                       {/* <Badge
+//                       variant="outline"
+//                       className="border-[#86efac]/30 text-[#86efac]"
+//                     >
+//                       Gross: ${(10000 * percentage).toFixed(2)}
+//                     </Badge> */}
+//                       <Badge
+//                         variant="outline"
+//                         className="border-[#86efac]/30 text-[#86efac]"
+//                       >
+//                         {(percentage * 100).toFixed(2)}% fees = $
+//                         {(10000 * percentage).toFixed(2)}
+//                       </Badge>
+//                       <Badge
+//                         variant="outline"
+//                         className="border-gray-600 text-gray-400"
+//                       >
+//                         Your Share: ${(10000 * percentage * 0.7).toFixed(2)}
+//                         {/* Net (70%): ${(10000 * percentage * 0.7).toFixed(2)} */}
+//                       </Badge>
+//                     </div>
+//                   </div>
+//                 )}
 //               </div>
 
 //               <Button
@@ -2272,13 +2401,13 @@ export default ReferralDashboard;
 //                 color: "text-[#86efac]",
 //                 bgColor: "bg-[#86efac]/10",
 //               },
-//               {
-//                 label: "Pending Earnings",
-//                 value: isNewUser ? "$0" : `$${stats.pending}`,
-//                 icon: Clock,
-//                 color: "text-yellow-400",
-//                 bgColor: "bg-yellow-400/10",
-//               },
+//               // {
+//               //   label: "Pending Earnings",
+//               //   value: isNewUser ? "$0" : `$${stats.pending}`,
+//               //   icon: Clock,
+//               //   color: "text-yellow-400",
+//               //   bgColor: "bg-yellow-400/10",
+//               // },
 //             ].map((stat, i) => (
 //               <motion.div
 //                 key={i}
@@ -2307,7 +2436,7 @@ export default ReferralDashboard;
 //           </div>
 
 //           {/* Chart */}
-//           <div className="max-w-4xl mx-auto">
+//           <div className="max-w-4xl mx-auto hidden">
 //             {isNewUser || history.length === 0 ? (
 //               <Card className="bg-gray-900/50 backdrop-blur-sm border-gray-800">
 //                 <CardContent className="p-12 text-center">
@@ -2322,7 +2451,17 @@ export default ReferralDashboard;
 //                     <Button
 //                       onClick={() => {
 //                         if (!connected || !walletAddress) {
-//                           toast.error("Connect your wallet to start earning!");
+//                           toast.custom((t) => (
+//                             <div
+//                               className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//                                 t.visible ? "animate-enter" : "animate-leave"
+//                               }`}
+//                               style={{ background: "#86efac", color: "#000" }}
+//                             >
+//                               <Wallet size={20} color="#000" />
+//                               <span>Connect your wallet to start earning!</span>
+//                             </div>
+//                           ));
 //                           return;
 //                         }
 //                         setShowModal(true);
@@ -2420,7 +2559,19 @@ export default ReferralDashboard;
 //                       key={filter}
 //                       variant="outline"
 //                       size="sm"
-//                       onClick={() => toast(`Sorting by ${filter} coming soon!`)}
+//                       onClick={() =>
+//                         toast.custom((t) => (
+//                           <div
+//                             className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//                               t.visible ? "animate-enter" : "animate-leave"
+//                             }`}
+//                             style={{ background: "#86efac", color: "#000" }}
+//                           >
+//                             <ListFilter size={20} color="#000" />
+//                             <span>Sorting by {filter} coming soon!</span>
+//                           </div>
+//                         ))
+//                       }
 //                       className="border-gray-700 text-gray-300 hover:bg-[#86efac]/10 hover:border-[#86efac]/50"
 //                     >
 //                       <ListFilter className="w-4 h-4 mr-1" />
@@ -2444,16 +2595,27 @@ export default ReferralDashboard;
 //                     <Button
 //                       onClick={() => {
 //                         if (!connected || !walletAddress) {
-//                           toast.error(
-//                             "Connect your wallet to unlock the power of referrals!"
-//                           );
+//                           toast.custom((t) => (
+//                             <div
+//                               className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-md ${
+//                                 t.visible ? "animate-enter" : "animate-leave"
+//                               }`}
+//                               style={{ background: "#86efac", color: "#000" }}
+//                             >
+//                               <Wallet size={20} color="#000" />
+//                               <span>
+//                                 Connect your wallet to unlock the power of
+//                                 referrals!
+//                               </span>
+//                             </div>
+//                           ));
 //                           return;
 //                         }
 //                         setShowModal(true);
 //                       }}
 //                       className="bg-[#86efac] text-black hover:bg-[#86efac]/90"
 //                     >
-//                       Get Your Code
+//                       Generate Link
 //                     </Button>
 //                   )}
 //                 </div>

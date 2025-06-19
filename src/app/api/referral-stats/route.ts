@@ -3,11 +3,6 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Validate Ethereum address
-// const isValidWalletAddress = (address: string): boolean => {
-//   return /^0x[a-fA-F0-9]{40}$/.test(address);
-// };
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -24,6 +19,7 @@ export async function GET(request: Request) {
     const user = await prisma.user.findUnique({
       where: { walletAddress },
       select: {
+        referralPointsTotal: true,
         referrals: { select: { id: true } },
         referralSettings: {
           select: {
@@ -56,6 +52,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       referrals: user.referrals.length,
+      referralPointsTotal: user.referralPointsTotal,
       earnings,
       pending,
     });

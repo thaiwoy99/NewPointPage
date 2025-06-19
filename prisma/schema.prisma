@@ -41,6 +41,7 @@ model User {
   defaultReferralPercentage Float?            @default(0.3)
   referralCode              String?           @unique
   referredById              Int?
+  referralPointsTotal       Int               @default(0)
   referredUserRecords       Referral[]        @relation("ReferredUserRecords")
   referralSettings          Referral[]        @relation("ReferrerSettings")
   referredBy                User?             @relation("Referrals", fields: [referredById], references: [id])
@@ -58,6 +59,7 @@ model Referral {
   referralPercentage Float
   status             ReferralStatus    @default(PENDING)
   createdAt          DateTime          @default(now())
+  hasGivenPoints     Boolean           @default(false)
   referredUser       User              @relation("ReferredUserRecords", fields: [referredUserId], references: [id])
   referrer           User              @relation("ReferrerSettings", fields: [referrerId], references: [id])
   referralEarnings   ReferralEarning[]
