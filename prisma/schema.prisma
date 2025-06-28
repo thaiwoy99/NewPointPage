@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                        Int               @id @default(autoincrement())
+  walletAddress             String            @unique
+  twitterUsername           String?           @unique
+  socialPointsTotal         Int               @default(0)
+  partnerPointsTotal        Int               @default(0)
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @default(now())
+  amountUsd                 Float             @default(0)
+  season1Activated          Boolean           @default(false)
+  season1Points             Int               @default(0)
+  season1Rank               Int               @default(0)
+  season2Activated          Boolean           @default(false)
+  season2Points             Int               @default(0)
+  season2Rank               Int               @default(0)
+  season3Activated          Boolean           @default(false)
+  season3Points             Int               @default(0)
+  season3Rank               Int               @default(0)
+  season4Activated          Boolean           @default(false)
+  season4Points             Int               @default(0)
+  season4Rank               Int               @default(0)
+  season5Activated          Boolean           @default(false)
+  season5Points             Int               @default(0)
+  season5Rank               Int               @default(0)
+  season0Activated          Boolean           @default(false)
+  season0Rank               Int               @default(0)
+  twitterId                 String?           @unique
+  name                      String?
+  profileImg                String?
+  domains                   Json?
+  blockchainPoints          Float             @default(0)
+  defaultReferralPercentage Float?            @default(0.3)
+  referralCode              String?           @unique
+  referredById              Int?
+  referralPointsTotal       Int               @default(0)
+  totalPoints               Float             @default(0)
+  isLimitOrderActive        Boolean           @default(false)
+  ataVerified   Boolean  @default(false)
+  limitOrderPoints          Int               @default(0)
+  referredUserRecords       Referral[]        @relation("ReferredUserRecords")
+  referralSettings          Referral[]        @relation("ReferrerSettings")
+  Transaction               Transaction[]
+  referredBy                User?             @relation("Referrals", fields: [referredById], references: [id])
+  referrals                 User[]            @relation("Referrals")
+  UserPartnerTask           UserPartnerTask[]
+  UserSocialTask            UserSocialTask[]
+
+  @@index([referredById], map: "User_referredById_fkey")
+}
+
+model Referral {
+  id                 String            @id @default(uuid())
+  referrerId         Int
+  referredUserId     Int
+  referralPercentage Float
+  status             ReferralStatus    @default(PENDING)
+  createdAt          DateTime          @default(now())
+  hasGivenPoints     Boolean           @default(false)
+  referredUser       User              @relation("ReferredUserRecords", fields: [referredUserId], references: [id])
+  referrer           User              @relation("ReferrerSettings", fields: [referrerId], references: [id])
+  referralEarnings   ReferralEarning[]
+
+  @@index([referrerId])
+  @@index([referredUserId])
+}
+
+model ReferralEarning {
+  id         String   @id @default(uuid())
+  referralId String
+  amount     Float
+  createdAt  DateTime @default(now())
+  referral   Referral @relation(fields: [referralId], references: [id])
+
+  @@index([referralId], map: "ReferralEarning_referralId_fkey")
+}
+
+model Partner {
+  id          Int           @id @default(autoincrement())
+  name        String        @unique
+  description String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime
+  PartnerTask PartnerTask[]
+}
+
+model PartnerTask {
+  id              Int                     @id @default(autoincrement())
+  partnerId       Int
+  name            String
+  description     String
+  pointSystem     PartnerTask_pointSystem
+  status          PartnerTask_status      @default(ACTIVE)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime
+  Partner         Partner                 @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  UserPartnerTask UserPartnerTask[]
+
+  @@index([partnerId], map: "PartnerTask_partnerId_fkey")
+}
+
+model SocialTask {
+  id             Int                    @id @default(autoincrement())
+  name           String
+  pointSystem    SocialTask_pointSystem
+  status         SocialTask_status      @default(ACTIVE)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime
+  UserSocialTask UserSocialTask[]
+}
+
+model UserPartnerTask {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  taskId      Int
+  completedAt DateTime    @default(now())
+  PartnerTask PartnerTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  User        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId])
+  @@index([taskId], map: "UserPartnerTask_taskId_fkey")
+}
+
+model UserSocialTask {
+  id          Int        @id @default(autoincrement())
+  userId      Int
+  taskId      Int
+  completedAt DateTime   @default(now())
+  SocialTask  SocialTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  User        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId])
+  @@index([taskId], map: "UserSocialTask_taskId_fkey")
+}
+
+model Account {
+  id        Int          @id @default(autoincrement())
+  publicKey String       @unique @db.VarChar(44)
+  apiKey    String?      @unique @db.VarChar(255)
+  role      Account_role @default(bidder)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime
+  Auction   Auction[]
+  Bid       Bid[]
+  NFT       NFT[]
+
+  @@index([publicKey])
+}
+
+model Auction {
+  id                            Int           @id @default(autoincrement())
+  publicKey                     String        @unique @db.VarChar(44)
+  nftId                         Int
+  listerId                      Int
+  startingPrice                 BigInt
+  startTime                     DateTime
+  endTime                       DateTime?
+  highestBidId                  Int?          @unique
+  state                         Auction_state
+  rewardPercentage              Int
+  timeExtension                 Int
+  createdAt                     DateTime      @default(now())
+  updatedAt                     DateTime
+  cancelledAt                   DateTime?
+  Bid_Auction_highestBidIdToBid Bid?          @relation("Auction_highestBidIdToBid", fields: [highestBidId], references: [id])
+  Account                       Account       @relation(fields: [listerId], references: [id], onDelete: Cascade)
+  NFT                           NFT           @relation(fields: [nftId], references: [id], onDelete: Cascade)
+  Bid_Bid_auctionIdToAuction    Bid[]         @relation("Bid_auctionIdToAuction")
+
+  @@index([listerId])
+  @@index([nftId])
+  @@index([publicKey])
+  @@index([state])
+}
+
+model Bid {
+  id                                Int       @id @default(autoincrement())
+  publicKey                         String    @unique @db.VarChar(44)
+  auctionId                         Int
+  bidderId                          Int
+  amount                            BigInt
+  state                             Bid_state
+  createdAt                         DateTime  @default(now())
+  updatedAt                         DateTime
+  cancelledAt                       DateTime?
+  refundedAt                        DateTime?
+  Auction_Auction_highestBidIdToBid Auction?  @relation("Auction_highestBidIdToBid")
+  Auction_Bid_auctionIdToAuction    Auction   @relation("Bid_auctionIdToAuction", fields: [auctionId], references: [id], onDelete: Cascade)
+  Account                           Account   @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId])
+  @@index([bidderId])
+  @@index([publicKey])
+  @@index([state])
+}
+
+model NFT {
+  id          Int       @id @default(autoincrement())
+  publicKey   String    @unique @db.VarChar(44)
+  tokenMint   String    @db.VarChar(44)
+  ownerId     Int
+  name        String?   @db.VarChar(255)
+  description String?   @db.Text
+  imageUrl    String?   @db.VarChar(255)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  Auction     Auction[]
+  Account     Account   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([publicKey, tokenMint])
+}
+
+model Transaction {
+  signature           String  @id
+  walletAddress       String
+  transactionValueUsd Float
+  blockTime           BigInt
+  processed           Boolean @default(false)
+  userId              Int?
+  User                User?   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+enum ReferralStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+enum SocialTask_pointSystem {
+  BOOST
+  ADDITION
+}
+
+enum SocialTask_status {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+enum PartnerTask_pointSystem {
+  BOOST
+  ADDITION
+}
+
+enum PartnerTask_status {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+enum Account_role {
+  bidder
+  lister
+  admin
+}
+
+enum Bid_state {
+  Active
+  Cancelled
+  Refunded
+}
+
+enum Auction_state {
+  Active
+  Sold
+  Cancelled
+}
