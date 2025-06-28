@@ -32,21 +32,36 @@ export async function POST(request: Request) {
     }
 
     // Check if user exists
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { walletAddress },
-      select: { id: true },
+      select: { id: true, referralCode: true },
     });
 
     if (!user) {
+      // Optionally, create the user here if you want
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // If user already has a referral code, return it
+    if (user.referralCode) {
+      return NextResponse.json(
+        { referralCode: user.referralCode },
+        { status: 200 }
+      );
+    }
+
     // Generate referral code
-    const baseCode = customCode ? customCode.toUpperCase() : "DEX";
-      //const referralCode = `${baseCode}-XYZ123`;
-    // const referralCode = `${baseCode}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    const referralCode = `${baseCode
-      .toUpperCase()}`;
+    let baseCode = customCode ? customCode.toUpperCase() : "DEX";
+    let referralCode = baseCode;
+
+    if (!customCode) {
+      // Generate a random 4-character suffix
+      const randomSuffix = Math.random()
+        .toString(36)
+        .substring(2, 6)
+        .toUpperCase();
+      referralCode = `${baseCode}-${randomSuffix}`;
+    }
 
     // Check uniqueness
     const existing = await prisma.user.findUnique({

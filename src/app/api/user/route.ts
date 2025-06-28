@@ -34,6 +34,7 @@ export async function GET(request: Request) {
         id: true,
         walletAddress: true,
         referralCode: true,
+        ataVerified: true,
         defaultReferralPercentage: true,
         referrals: { select: { id: true } },
         referralSettings: {
@@ -47,7 +48,19 @@ export async function GET(request: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      // Prepare response with truncated wallet address
+      const response = {
+        id: null,
+        walletAddress: null,
+        referralCode: null,
+        ataVerified: false,
+        defaultReferralPercentage: 0.3,
+        earnings: null,
+        referralsCount: null,
+      };
+
+      return NextResponse.json(response);
+      //return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Calculate total earnings
@@ -62,6 +75,7 @@ export async function GET(request: Request) {
       id: user.id,
       walletAddress: truncateWalletAddress(user.walletAddress),
       referralCode: user.referralCode,
+      ataVerified: user.ataVerified,
       defaultReferralPercentage: user.defaultReferralPercentage ?? 0.3,
       earnings,
       referralsCount: user.referrals.length,
