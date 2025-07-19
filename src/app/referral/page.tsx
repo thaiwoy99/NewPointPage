@@ -340,12 +340,38 @@ const ReferralDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-black">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(134,239,172,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(134,239,172,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(134,239,172,0.08),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(134,239,172,0.06),transparent_50%)]" />
+        <div className="relative min-h-screen mt-18 flex flex-col items-center justify-center px-6 text-foreground overflow-hidden">
+
+      {/* 🔥 Animated Background Glow Effect */}
+      <motion.div
+        animate={{ opacity: [0.2, 0.5, 0.2] }}
+        transition={{ duration: 4, repeat: Infinity }}
+        className="absolute inset-0 bg-zinc-500/10 blur-3xl"
+      />
+
+      {/* ✨ Floating Particles Effect */}
+      <div className="absolute inset-0 pointer-events-none bg-[url('/images/bg.png')] bg-cover bg-[50%] bg-no-repeat">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 0, scale: 0.5 }}
+            animate={{
+              opacity: [0.1, 0.5, 0.1],
+              y: [-10, 10, -10],
+              scale: [0.8, 1, 0.8],
+            }}
+            transition={{
+              duration: Math.random() * 3 + 2,
+              repeat: Infinity,
+              delay: Math.random() * 5,
+            }}
+            className="absolute w-2 h-2 bg-green-400 rounded-full"
+            style={{
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+            }}
+          />
+        ))}
       </div>
 
       <canvas ref={canvasRef} className="absolute inset-0 z-0 opacity-70" />

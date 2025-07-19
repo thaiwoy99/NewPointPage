@@ -11,7 +11,7 @@ export default function TasksPage() {
   const [taskType, setTaskType] = useState<"partner" | "social">("partner");
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-gray-900  text-white">
       {/* Navbar */}
       {/* <Navbar /> */}
 
