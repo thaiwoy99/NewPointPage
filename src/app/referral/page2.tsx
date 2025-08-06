@@ -877,7 +877,7 @@ const ReferralDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black mt-[80px] text-white relative overflow-hidden">
+    <div className="min-h-screen  bg-black mt-[80px] text-white relative overflow-hidden">
       {/* Enhanced background with professional gradients */}
       <div className="absolute inset-0 bg-black">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(134,239,172,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(134,239,172,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />

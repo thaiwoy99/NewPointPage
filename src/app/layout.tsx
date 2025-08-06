@@ -45,14 +45,14 @@ export default function RootLayout({
     // <html lang="en" className={spaceGrotesk.className} suppressHydrationWarning>
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${montserrat.className} ${montserrat.className} antialiased bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-300`}
+        className={`${montserrat.className} antialiased bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-300`}
       >
         <ThemeProvider>
           <UserWalletProvider>
             <WalletProvider>
               <AppWalletProvider>
                 <Toaster />
-                <Navbar />
+              {/*   <Navbar />*/}
                 {/* <Header /> */}
 
                 {children}

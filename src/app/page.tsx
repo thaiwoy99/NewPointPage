@@ -79,7 +79,7 @@ export default function DeserializeExpedition() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
-    <div className="relative min-h-screen mt-18 flex flex-col items-center justify-center px-6 bg-black text-foreground overflow-hidden">
+    <div className="relative min-h-screen mt-18 flex flex-col items-center justify-center px-6  text-foreground overflow-hidden">
       {/* 🔥 Animated Background Glow Effect */}
       <motion.div
         animate={{ opacity: [0.2, 0.5, 0.2] }}
@@ -88,7 +88,7 @@ export default function DeserializeExpedition() {
       />
 
       {/* ✨ Floating Particles Effect */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none   bg-[url('/images/bg.png')]  bg-cover bg-[50%] bg-no-repeat">
         {[...Array(20)].map((_, i) => (
           <motion.div
             key={i}
@@ -104,7 +104,7 @@ export default function DeserializeExpedition() {
               delay: Math.random() * 5,
             }}
             className="absolute w-2 h-2 bg-green-400 rounded-full"
-            style={{
+            style={{ 
               top: `${Math.random() * 100}%`,
               left: `${Math.random() * 100}%`,
             }}
