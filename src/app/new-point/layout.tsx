@@ -6,7 +6,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div>
       
-      {/*<NewpointNav/>*/}
+      <NewpointNav/>
       <main>{children}</main>
 
       

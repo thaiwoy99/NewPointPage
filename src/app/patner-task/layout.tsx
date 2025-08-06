@@ -6,7 +6,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div>
       
-      {/* <PatnertaskNav/>*/}
+      <PatnertaskNav/>
       <main>{children}</main>
 
       

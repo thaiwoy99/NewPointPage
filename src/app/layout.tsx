@@ -52,7 +52,7 @@ export default function RootLayout({
             <WalletProvider>
               <AppWalletProvider>
                 <Toaster />
-                <Navbar />
+              {/*   <Navbar />*/}
                 {/* <Header /> */}
 
                 {children}
