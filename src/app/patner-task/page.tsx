@@ -27,8 +27,8 @@ const page = () => {
             <button 
               key={i}
               className={`px-[20px] py-[10px] border-[0.3px] border-[#3FFF3DA3] ${
-                isActive ? "bg-[#10200B]" : "bg-[#FEFEFE40]"
-              } rounded-[12px] cursor-pointer`}
+                isActive ? "bg-[#10200B] hover:bg-[#FEFEFE40]"  : "bg-[#FEFEFE40] hover:bg-[#10200B]"
+              } rounded-[12px] cursor-pointer `}
             >
               {task}
             </button>

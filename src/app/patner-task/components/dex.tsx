@@ -95,7 +95,7 @@ const Dex = () => {
           key={index}
           className={`
             px-3 py-1.5 rounded-3xl border  border-[#FEFEFE] text-white font-light 
-            ${item.isActive ? 'bg-[#3FFF3D33] border-none' : ''} cursor-pointer
+            ${item.isActive ? 'bg-[#3FFF3D33] border-none' : ''} cursor-pointer hover:scale-105
           `}
         >
           {item.name}
