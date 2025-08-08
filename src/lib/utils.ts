@@ -50,23 +50,23 @@ const getTokenAccountAccount = async (
 
     // Dynamically import @solana/spl-token on the client side
     const splToken = await import("@solana/spl-token");
-    const { getAssociatedTokenAddress, getAccount } = splToken;
+   // const { getAssociatedTokenAddress, getAccount } = splToken;
 
     // Get the associated token account address for the user and the token mint
-    const ATA = await getAssociatedTokenAddress(
-      token,
-      address,
-      true,
-      programId
-    );
-    const tokenAccount = await getAccount(
-      connection,
-      ATA,
-      "confirmed",
-      programId
-    );
+   // const ATA = await getAssociatedTokenAddress(
+     // token,
+     // address,
+     // true,
+     // programId
+   // );
+    //const tokenAccount = await getAccount(
+    //  connection,
+      //ATA,
+      //"confirmed",
+     // programId
+    //);
 
-    return tokenAccount;
+   // return tokenAccount;
   } catch (error) {
     console.error("Error getting token account:", error);
     // console.log("token: ", token.toBase58());
