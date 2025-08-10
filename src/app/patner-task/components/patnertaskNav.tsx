@@ -23,13 +23,13 @@ const Logo = () => (
 const PatnertaskNav = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navItems = [
+  const [navItems,setNavItems] = useState( [
     { name: 'Swap', href: '#', active: true },
     { name: 'Bridge', href: '#', active: false },
     { name: 'Hub', href: '#', active: false },
     { name: 'Points', href: '#', active: false },
     { name: 'Listings', href: '#', active: false },
-  ];
+  ]); 
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -48,9 +48,9 @@ const PatnertaskNav = () => {
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-8">
               {navItems.map((item) => (
-                <a
+                <button
                   key={item.name}
-                  href={item.href}
+                  
                   className={`px-3 py-2 text-[22px] font-light transition-colors duration-200 ${
                     item.active
                       ? 'text-[#3FFF3D] border-b-2 border-[#3FFF3D]'
@@ -58,7 +58,7 @@ const PatnertaskNav = () => {
                   }`}
                 >
                   {item.name}
-                </a>
+                </button>
               ))}
             </div>
           </div>

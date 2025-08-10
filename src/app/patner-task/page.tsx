@@ -1,12 +1,20 @@
+'use client'
+
 import Dex from "./components/dex"
 import Stats from './components/stats'
+import { useState } from "react"
 
 interface tasks {
   task: string
   isActive: boolean
 }
 
-const Tasks: tasks[] = [
+
+const page = () => {
+
+
+  
+const [Tasks,setTasks] = useState([
   {
     task: 'Patners tasks',
     isActive: true
@@ -15,9 +23,19 @@ const Tasks: tasks[] = [
     task: 'Social tasks',
     isActive: false
   }
-]
+])
 
-const page = () => {
+
+const ChangeIsActive = (id:string):void=>{
+  setTasks((prev :tasks[])=>{
+   return  prev.map((item:tasks)=>(
+      item.task ===id?{...item,isActive:true}:{...item,isActive:false}
+    ))
+
+  })};
+
+
+
   return (
     <div className="min-h-screen relative">
       <div className="absolute inset-0 bg-[url('/images/bg.png')] bg-cover bg-center bg-no-repeat bg-[#0F0F0F] z-[-1]" />
@@ -29,6 +47,7 @@ const page = () => {
               className={`px-[20px] py-[10px] border-[0.3px] border-[#3FFF3DA3] ${
                 isActive ? "bg-[#10200B] hover:bg-[#FEFEFE40]"  : "bg-[#FEFEFE40] hover:bg-[#10200B]"
               } rounded-[12px] cursor-pointer `}
+              onClick={()=>{ChangeIsActive(task)}}
             >
               {task}
             </button>

@@ -1,36 +1,14 @@
-import Image from 'next/image';
 
-interface NavItem {
+
+'use client'
+import Image from 'next/image';
+import { useState } from 'react';
+
+interface buttonItem {
   name: string;
   isActive: boolean;
 }
 
-const navItems: NavItem[] = [
-  {
-    name: "All",
-    isActive: true
-  },
-  {
-    name: "Games",
-    isActive: false
-  },
-  {
-    name: "Defi",
-    isActive: false
-  },
-  {
-    name: "Bridges",
-    isActive: false
-  },
-  {
-    name: "Infra",
-    isActive: false
-  },
-  {
-    name: "Consumer",
-    isActive: false
-  }
-];
 
 
 
@@ -86,17 +64,58 @@ const namesArray: NameObject[] = [
 import React from 'react'
 
 const Dex = () => {
+
+const [buttonItems,setButtonItems] = useState<buttonItem[] >([
+  {
+    name: "All",
+    isActive: true
+
+  },
+  {
+    name: "Games",
+    isActive: false
+  },
+  {
+    name: "Defi",
+    isActive: false
+  },
+  {
+    name: "Bridges",
+    isActive: false
+  },
+  {
+    name: "Infra",
+    isActive: false
+  },
+  {
+    name: "Consumer",
+    isActive: false
+  }
+]);
+
+const ChangeIsActive = (id:string):void=>{
+  setButtonItems((prev :buttonItem[])=>{
+   return  prev.map((item:buttonItem)=>(
+      item.name ===id?{...item,isActive:true}:{...item,isActive:false}
+    ))
+
+  })
+}
+
+
+
   return (
     <div className='bg-[#262626]/50 border-[#ffffff]/30 rounded-2xl border p-6 w-[800px] 
       space-y-4  '> 
      <div className="flex gap-2">
-      {navItems.map((item, index) => (
+      {buttonItems.map((item, index) => (
         <button
           key={index}
           className={`
             px-3 py-1.5 rounded-3xl border  border-[#FEFEFE] text-white font-light 
             ${item.isActive ? 'bg-[#3FFF3D33] border-none' : ''} cursor-pointer hover:scale-105
           `}
+          onClick={()=>{ChangeIsActive(item.name)}}
         >
           {item.name}
         </button>
